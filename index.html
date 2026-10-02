@@ -2924,10 +2924,38 @@ function trackSession(prev, st){
   }
 }
 function data(){ return demo || { sessions:store.sessions, lastClean:store.lastClean }; }
+// ranked counts only this Puffco account's sessions (several accounts can share one phone)
+function acctId(){ const a = store.account, id = a && a.data && a.data.user && a.data.user.id; return id != null ? String(id) : (a && a.email ? 'e:' + a.email.toLowerCase() : null); }
+function rankSessions(){
+  if (demo) return demo.sessions;
+  const id = acctId(), all = store.sessions || [];
+  if (!id) return all; // not signed in: just this phone's history (nothing goes to the leaderboard)
+  return all.filter(s => s.acct ? s.acct === id : store.sessOwner === id);
+}
+// sessions saved before accounts were tracked: ask once who they belong to
+function claimPrompt(){
+  const id = acctId(); if (!id || demo || store.sessOwner || document.querySelector('.egg')) return;
+  store.claimAsked = store.claimAsked || {}; if (store.claimAsked[id]) return;
+  const n = (store.sessions || []).filter(s => !s.acct).length; if (!n) return;
+  const who = (store.account && store.account.email) || 'this Puffco account';
+  const el = document.createElement('div'); el.className = 'egg';
+  el.innerHTML = `<div class="egg-card" role="dialog" aria-label="Whose sessions are these">
+    <h2>Are these your sessions?</h2>
+    <p>This phone has <b style="color:var(--fg)">${n} session${n > 1 ? 's' : ''}</b> saved from before. Should they count for ranked on <b style="color:var(--fg)">${esc(who)}</b>?</p>
+    <p style="font-size:14px">Pick no if this is a second account. Only one account can claim them.</p>
+    <button class="btn primary" id="clYes" style="width:100%">Yes, they’re mine</button>
+    <button class="btn" id="clNo" style="width:100%">No, start fresh</button></div>`;
+  document.body.appendChild(el); applyHaptics();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  const done = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 260); try { drawRank(); drawBadgeBook(); drawSocial(); } catch(e){} lbPush(true); };
+  el.querySelector('#clYes').onclick = () => { store.sessOwner = id; save(); done(); toast('Sessions added to your rank'); };
+  el.querySelector('#clNo').onclick = () => { store.claimAsked[id] = true; save(); done(); };
+}
 function logSession(s){
   if (ble.dev && S.mode === 'live'){ s.dev = ble.dev.id; s.series = S.series || 'peach'; }
+  if (!demo && acctId()) s.acct = acctId();
   const d = data();
-  let rankBefore = null; try { rankBefore = rankFor(d.sessions); } catch(e){}
+  let rankBefore = null; try { rankBefore = rankFor(rankSessions()); } catch(e){}
   d.sessions.push(s);
   try { skinCelebrate(s); } catch(e){}
   if (demo){ demo.since++; }
@@ -3646,7 +3674,7 @@ function devBadge(size){
 }
 // past months you've played, newest first, with the tier you finished on
 function badgeHistory(){
-  const ss = data().sessions; if (!ss.length) return [];
+  const ss = rankSessions(); if (!ss.length) return [];
   const now = new Date(), out = [], seen = new Set();
   for (const s of ss){ const d = new Date(s.t); const k = d.getFullYear() * 12 + d.getMonth(); if (k >= now.getFullYear() * 12 + now.getMonth()) continue; seen.add(k); }
   [...seen].sort((a, b) => b - a).slice(0, 24).forEach(k => { const y = Math.floor(k / 12), m = k % 12; const r = rankFor(ss, new Date(y, m, 15)); out.push({ y, m, t: rbTierIdx(r.tier.n), rp: r.rp }); });
@@ -3712,7 +3740,7 @@ function sessionPop(s, gained){
 }
 function afterSessionLogged(s, before){
   try {
-    const after = rankFor(data().sessions);
+    const after = rankFor(rankSessions());
     const gained = after.rp - before.rp;
     if (view === 'home') sessionPop(s, gained); else toast(`Session done · ${gained > 0 ? '+' : ''}${gained} RP`);
     const bi = RANK_TIERS.findIndex(t => t.n === before.tier.n), ai = RANK_TIERS.findIndex(t => t.n === after.tier.n);
@@ -3750,7 +3778,7 @@ function rankFor(sessions, when){
 function drawRank(){ drawRankInner(); applyHaptics(); }
 function drawRankInner(){
   const el = $('#rankCard'); if (!el) return;
-  const r = rankFor(data().sessions), t = r.tier, nx = r.next;
+  const r = rankFor(rankSessions()), t = r.tier, nx = r.next;
   const pct = nx ? Math.round((r.rp - t.min) / (nx.min - t.min) * 100) : 100;
   const dirtyNow = sinceClean() > RANK_DIRTY;
   el.style.setProperty('--tc', t.c);
@@ -3842,7 +3870,7 @@ async function lbCall(body){
   }
 }
 function lbPayload(){
-  const r = rankFor(data().sessions), m = lbMonth(), me = LB.me && LB.me.month === m ? LB.me : null;
+  const r = rankFor(rankSessions()), m = lbMonth(), me = LB.me && LB.me.month === m ? LB.me : null;
   const rp = Math.max(r.rp, me ? me.rp || 0 : 0), bl = Math.max(r.blinkers, me ? me.blinkers || 0 : 0);
   return { rp, tier: rp > r.rp && me ? me.tier : r.tier.n, blinkers: bl, month: m };
 }
@@ -3902,7 +3930,7 @@ function earnedBadges(){
 }
 function showcaseEditor(){
   if (!LB.pick) LB.pick = ((LB.me && LB.me.showcase) || []).slice(0, 3);
-  const row = { tier: rankFor(data().sessions).tier.n }, earned = earnedBadges(), P = LB.pick;
+  const row = { tier: rankFor(rankSessions()).tier.n }, earned = earnedBadges(), P = LB.pick;
   return `<div class="row between"><span class="label">Showcase badges</span><span class="muted" style="font-size:13px">${P.length} / 3</span></div>
     <div class="sc-slots">${[0,1,2].map(i => P[i] ? `<button class="sc-slot filled" data-scrm="${i}" aria-label="Remove ${esc(showName(P[i], row))}"><span class="sc-n">${i+1}</span><span class="sc-x">✕</span>${showBadge(P[i], undefined, row)}</button>` : `<div class="sc-slot"><span class="sc-n">${i+1}</span><span class="sc-plus">+</span></div>`).join('')}</div>
     <p class="muted" style="margin:0;font-size:13px">Tap badges you’ve earned to add them. Tap a slot to remove one, or swipe it sideways to change the order.</p>
@@ -4229,7 +4257,7 @@ const SPB_ALL = SPB.CATS.flatMap(c => c.badges.map(b => Object.assign({ cat: c.n
 const spbById = id => SPB_ALL.find(b => b.id === id);
 // which special badges you've earned, worked out from your own history (plus server awards for the hand-given ones)
 function spbStatus(){
-  const ss = (store.sessions || []).slice().sort((a, b) => a.t - b.t), out = {};
+  const ss = rankSessions().slice().sort((a, b) => a.t - b.t), out = {};
   const hitsOf = s => s.hits || [], best = s => Math.max(0, ...hitsOf(s));
   const bestHit = ss.reduce((m, s) => Math.max(m, best(s)), 0);
   out.ironlungs = { got: bestHit >= 12, prog: bestHit ? 'Best ' + bestHit.toFixed(1) + 's / 12s' : '' };
@@ -4369,10 +4397,10 @@ function drawSocial(){
   } else {
     const c = SOC.myCounts, sc = me.showcase || [];
     setHTML(meEl, `<div class="soc-head">${lbAvatar(me.avatar_url, me.username, 72)}<div class="soc-id"><b>${esc(me.username)}${me.dev ? devBadge(22) : ''}</b>
-        <span class="muted"><span style="color:${lbTierColor(rankFor(data().sessions).tier.n)};font-weight:700">${rankFor(data().sessions).tier.n}</span> · ${rankFor(data().sessions).rp} RP</span>
+        <span class="muted"><span style="color:${lbTierColor(rankFor(rankSessions()).tier.n)};font-weight:700">${rankFor(rankSessions()).tier.n}</span> · ${rankFor(rankSessions()).rp} RP</span>
         <div class="soc-counts"><span><b data-cnt="followers">${c ? c.followers : '–'}</b> followers</span><span><b data-cnt="following">${c ? c.following : '–'}</b> following</span></div></div></div>
       ${me.bio ? `<p class="soc-bio">${esc(me.bio)}</p>` : '<p class="muted" style="margin:0;font-size:14px">No bio yet.</p>'}
-      ${sc.length ? `<div class="lbp-shelf">${sc.map(k => `<div data-bv="${bvResolve(k, { tier: rankFor(data().sessions).tier.n })}">${showBadge(k, undefined, { tier: rankFor(data().sessions).tier.n })}<span>${esc(showName(k, { tier: rankFor(data().sessions).tier.n }))}</span></div>`).join('')}</div>` : ''}
+      ${sc.length ? `<div class="lbp-shelf">${sc.map(k => `<div data-bv="${bvResolve(k, { tier: rankFor(rankSessions()).tier.n })}">${showBadge(k, undefined, { tier: rankFor(rankSessions()).tier.n })}<span>${esc(showName(k, { tier: rankFor(rankSessions()).tier.n }))}</span></div>`).join('')}</div>` : ''}
       <button class="btn" id="socEdit">Edit profile</button>`);
   }
   // search results
@@ -5678,9 +5706,13 @@ async function puffcoSignIn(email, password){
   try { t = await apiFetch('/api/users/login', { method:'POST', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body: JSON.stringify({ email, password }) }); }
   catch(e){ if (e.kind === 'auth') throw new AcctError('auth', 'Wrong email or password. If you sign in to Puffco with Apple or Google, set a password in the Puffco app first (Account → Change password).'); throw e; }
   if (!t || !t.accessToken) throw new AcctError('http', 'Puffco didn’t return a sign-in token.');
+  const switching = store.account && store.account.email && store.account.email !== email;
+  if (switching){ // a different Puffco account: forget the last one's profile so nothing carries over
+    store.account = null; LB.me = null; LB.rows = null; const L = lbStore(); L.joined = false; L.meCache = null; L.username = ''; L.dev = false;
+  }
   store.account = Object.assign(store.account || {}, { auth: { accessToken: t.accessToken, refreshToken: t.refreshToken }, email }); save();
   await puffcoSync();
-  lbRestore().then(p => { if (p && p.username) toast('Welcome back, ' + p.username); });
+  lbRestore().then(p => { if (p && p.username) toast('Welcome back, ' + p.username); try { drawSocial(); drawRank(); } catch(e){} setTimeout(claimPrompt, 1200); });
 }
 async function puffcoSync(quiet){
   drawStats.sig = null;
@@ -6256,6 +6288,7 @@ requestAnimationFrame(gaugeLoop);
 setTimeout(ignite, 350);
 // first time using the app: ask to sign in to Puffco and sync, otherwise the usual greeting
 if (!store.onboarded && !(store.account && store.account.data)) setTimeout(showWelcome, 600); else setTimeout(showGreeting, 500);
+setTimeout(claimPrompt, 7000);
 addEventListener('resize', () => moveTabPill(view));
 document.fonts && document.fonts.ready.then(() => moveTabPill(view));
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { applyTheme(); draw(); });
