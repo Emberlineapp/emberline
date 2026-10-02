@@ -2026,7 +2026,7 @@ let demo = null; // demo dataset: {sessions, since, lastClean}
 const CHAMBERS = { 0:'No chamber', 1:'Classic', 2:'3DXL', 3:'3D' };
 const VAPOR = [ {v:0, n:'Smooth'}, {v:0.5, n:'Bold'}, {v:1, n:'Intense'}, {v:1.5, n:'Extreme', xl:true} ];
 const vaporName = v => (VAPOR.reduce((a,b) => Math.abs(b.v - v) < Math.abs(a.v - v) ? b : a)).n;
-const is3DXL = () => S.chamber === 2;
+const is3DXL = () => !isProxy() && S.chamber === 2;
 const fmtDelta = f => store.unit === 'F' ? `+${Math.round(f)}°F` : `+${Math.round(f * 5 / 9)}°C`;
 
 /* ================= Lorax BLE protocol ================= */
@@ -2039,7 +2039,7 @@ const enc = new TextEncoder(), dec = new TextDecoder();
 const MAX_MSG = 128; // Peak Pro ATT MTU is 131 (minus 3 byte header)
 
 class Lorax {
-  constructor(){ this.seq=1; this.pending=new Map(); this.queue=Promise.resolve(); this.dev=null; }
+  constructor(){ this.seq=1; this.pending=new Map(); this.queue=Promise.resolve(); this.dev=null; this.ints={}; }
   async request(showAll, name, id){
     const opt = { optionalServices:[SVC, PIKACHU, PUP, OTA], optionalManufacturerData:[PUFFCO_CO] };
     const base = [{ services:[SVC] }, { services:[PIKACHU] }, { manufacturerData:[{ companyIdentifier:PUFFCO_CO }] }];
@@ -2077,7 +2077,7 @@ class Lorax {
     this._onRep = e => this._onReply(e.target.value);
     rep.addEventListener('characteristicvaluechanged', this._onRep);
     await withTimeout(rep.startNotifications(), 8000, 'gatt');
-    this.rep = rep; this.cmd = cmd; this.seq = 1; this.pending.clear(); this.queue = Promise.resolve();
+    this.rep = rep; this.cmd = cmd; this.seq = 1; this.ints = {}; this.pending.clear(); this.queue = Promise.resolve();
     st('auth'); await this._auth();
   }
   disconnect(silent){
@@ -2133,11 +2133,32 @@ class Lorax {
     b[0]=offset&0xff; b[1]=offset>>8; b[2]=flags; b.set(p,3); b[3+p.length]=0; b.set(bytes, 4+p.length);
     return this.run(OP.WRITE, b, 3000);
   }
-  async f32(path, size = 4){ const r = await this.read(path, size); return new DataView(r.buffer).getFloat32(0, true); }
+  // Peak Pro stores numbers as 32-bit floats. The Proxy stores some as whole numbers, which read as ~0 if treated
+  // as floats (that's the 0% battery / 32°F bug). Spot that, read them as integers, and remember it for writes.
+  async f32(path, size = 4){
+    const r = await this.read(path, size);
+    if (r.length < 4){ const dv0 = new DataView(r.buffer, r.byteOffset, r.length); const v = r.length >= 2 ? dv0.getUint16(0, true) : r.length ? r[0] : 0; this.ints[path] = { scale: 1 }; return v; }
+    const dv = new DataView(r.buffer, r.byteOffset, r.length), f = dv.getFloat32(0, true), bits = dv.getUint32(0, true);
+    if (bits !== 0 && (!isFinite(f) || Math.abs(f) < 1e-20)){
+      const v = dv.getInt32(0, true), scale = this.intScale(path);
+      this.ints[path] = { scale }; return v === -2147483648 ? 0 : v / scale; // that value means "not set"
+    }
+    return f;
+  }
+  intScale(path){
+    // Proxy units (from the device inspector): temps in tenths of °C, times in hundredths of a second,
+    // battery in hundredths of a percent, volts in millivolts
+    if (/temp|btmp|tcmd/.test(path)) return 10;
+    if (/elap|tott|time|btim/.test(path)) return 100;
+    if (/bat\/soc/.test(path)) return 100;
+    if (/volt/.test(path)) return 1000;
+    if (/led\/dif/.test(path)) return 1000;
+    return 1;
+  }
   async u8(path){ return (await this.read(path, 1))[0]; }
   async u32(path){ const r = await this.read(path, 4); return new DataView(r.buffer).getUint32(0, true); }
   async str(path){ const r = await this.read(path, 64); return dec.decode(r).split('\0')[0].trim(); }
-  wf32(path, v){ const b = new Uint8Array(4); new DataView(b.buffer).setFloat32(0, v, true); return this.write(path, b); }
+  wf32(path, v){ const b = new Uint8Array(4), t = this.ints[path]; if (t) new DataView(b.buffer).setInt32(0, Math.round(v * t.scale), true); else new DataView(b.buffer).setFloat32(0, v, true); return this.write(path, b); }
   async readAll(path){
     const out = []; let off = 0;
     while (off < 4096){
@@ -2411,7 +2432,7 @@ async function afterConnect(quick){
     })();
     return;
   }
-  S.mode = 'live'; S.name = ble.dev.name || 'Peak Pro'; failStreak = 0;
+  S.mode = 'live'; S.name = ble.dev.name || 'Peak Pro'; failStreak = 0; S.devName = null; S.edition = null; // don't carry the last device's name over
   await detectLedApi();
   try { S.state = await ble.u8('/p/app/stat/id'); } catch(e){}
   connectIntro(); // the logo lights up now while the rest loads
@@ -2430,7 +2451,7 @@ async function afterConnect(quick){
     try { await slowPoll(); render(); } catch(e){}
     try { await readProfiles(); render(); if (view === 'prof') drawProfiles(); } catch(e){}
     try { await applyProfileBright(S.active); } catch(e){}
-    try { await readDeviceInfo(); render(); } catch(e){}
+    try { await readDeviceInfo(); render(); rememberDevice(); save(); } catch(e){}
     try { await readSerial(); } catch(e){}
     try { await readBatteryDetail(); } catch(e){}
     if (store.cleanBaseOdo == null && S.odo != null){ store.cleanBaseOdo = S.odo - (store.localSince || 0); save(); }
@@ -2861,7 +2882,7 @@ async function readProfiles(){
 
 async function slowPoll(){
   if (++slowPoll.n % 4 === 0) await readBatteryDetail();
-  try { S.chamber = await ble.u8('/p/htr/chmt'); } catch(e){}
+  if (!isProxy()){ try { S.chamber = await ble.u8('/p/htr/chmt'); } catch(e){} } else S.chamber = null; // Proxy has no swappable chamber
   try { S.battery = clamp(Math.round(await ble.f32('/p/bat/soc')),0,100); } catch(e){}
   try { const c = await ble.u8('/p/bat/chg/stat'); S.charging = c === 0 || c === 1; } catch(e){}
   if (S.charging){
@@ -3400,7 +3421,7 @@ function chargeLine(){
 function draw(){
   // header
   $('#devName').firstChild.textContent = S.mode === 'live' ? (S.devName || S.name) : 'Emberline';
-    $('#devSub').textContent = S.mode === 'live' ? (isProxy() ? `Proxy${S.charging ? ' · charging' : ''}` : `${S.edition ? S.edition + ' ' : ''}Peak Pro · ${CHAMBERS[S.chamber] ?? 'Chamber ?'}${S.charging ? ' · charging' : ''}`) : S.mode === 'demo' ? `Demo mode · ${CHAMBERS[S.chamber]}` : 'Not connected';
+    $('#devSub').textContent = S.mode === 'live' ? (isProxy() ? `Proxy${S.charging ? ' · charging' : ''}` : `${S.edition ? S.edition + ' ' : ''}Peak Pro · ${CHAMBERS[S.chamber] ?? 'Chamber ?'}${S.charging ? ' · charging' : ''}`) : S.mode === 'demo' ? `Demo mode · ${isProxy() ? 'Proxy' : CHAMBERS[S.chamber] ?? '3D Chamber'}` : 'Not connected';
   const bt = $('#batt'); bt.style.visibility = 'visible'; bt.hidden = !(S.mode === 'live' && S.battery != null); // hidden takes no space, so the device name gets the room
   bt.querySelector('b').style.width = (S.battery || 0) + '%';
   bt.querySelector('b').style.background = S.battery < 20 ? 'var(--bad)' : S.battery < 40 ? 'var(--warn)' : 'var(--good)';
@@ -3440,7 +3461,7 @@ function drawHome(){
   $('#gTarget').textContent = `Target ${fmtT(shownTarget)}${U()} · ${p.time}s · ${vaporName(p.vapor)}`;
   $('#adjustRow').hidden = !heatingNow;
   setHTML($('#bBoost'), `<span class="bst"><span>Boost</span><small>+${store.unit === 'F' ? Math.round(p.boostF) : Math.round(p.boostF * 5 / 9)}° +${p.boostT}s</small></span>`);
-  const noCh = S.mode === 'live' && S.chamber === 0, cb = $('#chamberBanner');
+  const noCh = S.mode === 'live' && !isProxy() && S.chamber === 0, cb = $('#chamberBanner');
   cb.hidden = !noCh;
   if (noCh) cb.innerHTML = '<div class="grow"><b>No chamber detected</b>Seat the chamber firmly to heat up.</div>';
   const live = S.mode === 'live';
@@ -3451,7 +3472,7 @@ function drawHome(){
   setHTML($('#gTimer'), S.state === 8 ? `${left}s left` : S.state === 7 ? 'Heating up…' : live && S.charging ? chargeLine() : '&nbsp;');
   { const h = hitText(), g = $('#gHit'); if (g.innerHTML !== h) g.innerHTML = h; }
   const heating = S.state >= 7 && S.state <= 9;
-  $('#bStart').disabled = (live && heating) || (live && S.chamber === 0) || (!live && (C.state === 'connecting' || C.state === 'reconnecting'));
+  $('#bStart').disabled = (live && heating) || (live && !isProxy() && S.chamber === 0) || (!live && (C.state === 'connecting' || C.state === 'reconnecting'));
   if (live && heating) holdWake(); else releaseWake(); $('#bStop').disabled = !heating; $('#bBoost').disabled = !heating;
   { const act = $('#bStart').parentElement, run = live && heating; if (act.classList.contains('run') !== run){ act.classList.toggle('run', run); act.classList.remove('morph'); void act.offsetWidth; act.classList.add('morph'); } }
 
@@ -5013,7 +5034,7 @@ function updateCluster(){
   set('#ckTarget', String(fmtT(p.tempC)));
   set('#ckGear', GEAR[S.state] || 'P');
   set('#ckMode', (p.name || 'Profile').toUpperCase().slice(0, 12));
-  set('#ckModeSub', `${(CHAMBERS[S.chamber] || '').toUpperCase()} · ${vaporName(p.vapor).toUpperCase()} · ${p.time}s`);
+  set('#ckModeSub', `${isProxy() ? 'PROXY' : (CHAMBERS[S.chamber] || '').toUpperCase()} · ${vaporName(p.vapor).toUpperCase()} · ${p.time}s`);
   const left = Math.max(0, Math.round(S.total - S.elapsed));
   set('#ckStatus', S.state === 8 && HIT.on ? `HIT ${HIT.live.toFixed(1)}` : S.state === 8 ? `${left}s` : (STATE_NAMES[S.state] || 'Idle').toUpperCase());
   const lerp = (a, b, k) => a + (b - a) * k;
@@ -5219,7 +5240,7 @@ function ltBar(){
   const el = $('#ltBar'); if (!el) return;
   const editing = LT.on && !!ed, show = LT.on && (editing || LT.pending || LT.brDirty);
   el.hidden = !show; document.body.classList.toggle('lt-open', !!show); if (!show) return;
-  if (editing){ $('#ltBarTxt').innerHTML = `${esc(ed.name || (ed.tag === ZONE_TAG ? 'My zones' : 'My mood'))}<small>Live on your Peak · not saved</small>`; return; }
+  if (editing){ $('#ltBarTxt').innerHTML = `${esc(ed.name || (ed.tag === ZONE_TAG ? 'My zones' : 'My mood'))}<small>Live on your ${isProxy() ? 'Proxy' : 'Peak'} · not saved</small>`; return; }
   const what = [LT.pending && LT.pending.name, LT.brDirty && 'brightness'].filter(Boolean).join(' + ');
   $('#ltBarTxt').innerHTML = `${esc(what)}<small>Not saved to ${esc(ltTargetName())} yet</small>`;
 }
@@ -5264,13 +5285,14 @@ const INTRO_ZONES = { motion:'still', tempoFrac:.5, zones:[
   { c:'#ffffff', c2:'#64007d', fx:'fade',  sp:.25, bias:.25 },    // logo bottom: mostly purple, a quick flash of white
   { c:'#000000', fx:'off' },                            // base right: off
   { c:'#000000', fx:'off' } ] };                        // glass left: off  (only the logo lights up)
+const INTRO_PROXY = { motion:'still', tempoFrac:.5, zones: Array.from({ length: 6 }, () => ({ c:'#ffffff', c2:'#64007d', fx:'fade', sp:.25, bias:.25 })) }; // Proxy ring: purple, with a white sweep going around
 let introDone = false;
 function connectIntro(){
   if (introDone || S.mode !== 'live' || S.api === 2 || (S.state >= 7 && S.state <= 9) || zoneLive.on) return;
   introDone = true;
-  const meta = JSON.parse(JSON.stringify(INTRO_ZONES));
+  const meta = JSON.parse(JSON.stringify(isProxy() ? INTRO_PROXY : INTRO_ZONES));
   meta.env = { in: 500, out: 4300, outMs: 650 }; // 5 seconds: glide on fast, glide off at the end
-  zPh.length = 0; zClock.last = 0; zPh[3] = .5; // start on purple
+  zPh.length = 0; zClock.last = 0; if (isProxy()) meta.zones.forEach((z, i) => { zPh[i] = .5 + i / 12; }); else zPh[3] = .5; // start on purple
   if (!zoneLiveStart(meta, true)) return;
   setTimeout(() => { if (zoneLive.on && zoneLive.meta === meta) zoneLiveStop(true); }, 5050); // leave it alone if the zone editor took over
 }
@@ -5380,21 +5402,28 @@ function defaultsForTpl(tpl){
   const m = {}; for (const u of tpl.ui || []) m[u.key] = u.type === 'colors' ? String(u.default).split(',') : u.default; return m;
 }
 function proxySVG(){
-  // Proxy: slim battery body with the glass on top; 12 lights in a ring, shown as 6 arcs
-  const cx = 100, cy = 252, rx = 52, ry = 13, arcs = [];
-  for (let i = 0; i < 6; i++){
-    const a0 = Math.PI * (i / 3) + .06, a1 = Math.PI * ((i + 1) / 3) - .06, p = a => [cx + rx * Math.cos(a), cy + ry * Math.sin(a)];
-    const [x0, y0] = p(a0), [x1, y1] = p(a1);
-    arcs.push(`<g data-z="${i}"><path class="zl zarc" d="M${x0.toFixed(1)} ${y0.toFixed(1)} A${rx} ${ry} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}" fill="none" stroke-width="7" stroke-linecap="round"/></g>`);
-  }
+  // Proxy, front view: angled mouthpiece, rubber cone, the glowing glass light band (12 lights, shown as 6 zones), round black battery body
+  const L = 44, R = 156, T = 150, B = 178, w = (R - L) / 6, slices = [];
+  for (let i = 0; i < 6; i++) slices.push(`<g data-z="${i}"><rect class="zl" x="${(L + i * w + .8).toFixed(1)}" y="${T - 4}" width="${(w - 1.6).toFixed(1)}" height="${B - T + 8}" clip-path="url(#zpBand)"/></g>`);
   return `<svg class="zpeak" viewBox="0 0 200 300" aria-label="Proxy zones">
-    <defs><linearGradient id="zpb" x1="0" x2="1"><stop offset="0" stop-color="#0c0c10"/><stop offset=".45" stop-color="#2a2930"/><stop offset="1" stop-color="#0c0c10"/></linearGradient>
-      <linearGradient id="zpg" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".4" stop-color="#fff" stop-opacity=".03"/><stop offset="1" stop-color="#fff" stop-opacity=".12"/></linearGradient></defs>
-    <path d="M86 14 h28 q4 0 4 4 v58 q0 10 10 18 q8 8 8 20 v20 h-72 v-20 q0 -12 8 -20 q10 -8 10 -18 v-58 q0 -4 4 -4z" fill="url(#zpg)" stroke="rgba(255,255,255,.38)"/>
-    <rect x="62" y="134" width="76" height="112" rx="14" fill="url(#zpb)" stroke="rgba(255,255,255,.14)"/>
-    <rect x="62" y="134" width="76" height="9" rx="4" fill="rgba(255,255,255,.08)"/>
-    <ellipse cx="${cx}" cy="${cy}" rx="${rx + 6}" ry="${ry + 5}" fill="#0b0b0e" stroke="rgba(255,255,255,.12)"/>
-    ${arcs.join('')}
+    <defs>
+      <linearGradient id="zpBody" x1="0" x2="1"><stop offset="0" stop-color="#08080a"/><stop offset=".32" stop-color="#2b2b30"/><stop offset=".55" stop-color="#1a1a1e"/><stop offset="1" stop-color="#070709"/></linearGradient>
+      <linearGradient id="zpCone" x1="0" x2="1"><stop offset="0" stop-color="#0b0b0d"/><stop offset=".35" stop-color="#2c2c31"/><stop offset=".6" stop-color="#1b1b1f"/><stop offset="1" stop-color="#09090b"/></linearGradient>
+      <linearGradient id="zpShine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".12"/></linearGradient>
+      <clipPath id="zpBand"><path d="M${L} ${T} Q100 ${T + 6} ${R} ${T} L${R} ${B} Q100 ${B + 6} ${L} ${B} Z"/></clipPath>
+    </defs>
+    <path d="M82 76 L82 34 Q82 22 93 22 L110 27 Q118 29 118 38 L118 76 Z" fill="url(#zpCone)" stroke="rgba(255,255,255,.14)"/>
+    <rect x="92" y="30" width="9" height="4" rx="2" fill="#000" transform="rotate(14 96 32)"/>
+    <rect x="113" y="48" width="3" height="8" rx="1.5" fill="#000"/>
+    <path d="M78 76 L122 76 L124 92 L76 92 Z" fill="url(#zpCone)" stroke="rgba(255,255,255,.1)"/>
+    <path d="M76 92 L124 92 Q150 118 ${R} ${T} L${L} ${T} Q50 118 76 92 Z" fill="url(#zpCone)" stroke="rgba(255,255,255,.12)"/>
+    <path d="M70 108 q8 -4 16 0 M96 104 q8 -4 16 0 M64 124 q10 -4 20 0 M92 120 q10 -4 20 0 M120 118 q8 -4 16 0" stroke="rgba(255,255,255,.07)" stroke-width="2" fill="none"/>
+    <path d="M${L - 1} ${T} Q100 ${T + 6} ${R + 1} ${T} L${R + 1} ${B} Q100 ${B + 6} ${L - 1} ${B} Z" fill="#050507"/>
+    ${slices.join('')}
+    <path d="M${L} ${T} Q100 ${T + 6} ${R} ${T} L${R} ${B} Q100 ${B + 6} ${L} ${B} Z" fill="url(#zpShine)" pointer-events="none"/>
+    <path d="M62 ${T - 2} q-2 10 0 22 q4 4 8 0 q2 -10 0 -18 Z" fill="#141417" stroke="rgba(255,255,255,.15)" pointer-events="none"/>
+    <path d="M${L + 2} ${B + 3} Q100 ${B + 9} ${R - 2} ${B + 3} L${R - 2} 262 Q${R - 2} 288 128 288 L72 288 Q${L + 2} 288 ${L + 2} 262 Z" fill="url(#zpBody)" stroke="rgba(255,255,255,.12)"/>
+    <text x="58" y="250" font-size="6" letter-spacing="2.5" fill="rgba(255,255,255,.28)" transform="rotate(-90 58 250)" font-family="system-ui,sans-serif">PROXY</text>
   </svg>`;
 }
 function peakSVG(){
@@ -5578,7 +5607,7 @@ function drawDevice(){
     <div class="row between"><span>Lantern turns off after</span><div class="seg" id="ltSeg">${[[1800,'30m'],[3600,'1h'],[7200,'2h'],[14400,'4h']].map(([s, l]) => `<button data-lt="${s}" aria-pressed="${(store.lanternTime || 7200) === s}">${l}</button>`).join('')}</div></div>
     <div class="devinfo">
       <div><span class="muted">Edition</span><b>${d(S.edition)}</b></div>
-      <div><span class="muted">Chamber</span><b>${d(CHAMBERS[S.chamber])}</b></div>
+      ${isProxy() ? '' : `<div><span class="muted">Chamber</span><b>${d(CHAMBERS[S.chamber])}</b></div>`}
       <div><span class="muted">Firmware</span><b>${d(S.fw)}</b></div>
       <div><span class="muted">Battery</span><b>${S.battery == null ? '—' : S.battery + '%'}${S.batVolts ? ' · ' + S.batVolts.toFixed(2) + 'V' : ''}</b></div>
       <div><span class="muted">Battery temp</span><b>${S.batTemp ? (store.unit === 'F' ? Math.round(c2f(S.batTemp)) + '°F' : Math.round(S.batTemp) + '°C') : '—'}</b></div>
