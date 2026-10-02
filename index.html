@@ -1066,7 +1066,7 @@ img,svg{-webkit-user-drag:none;-webkit-touch-callout:none}
 @keyframes rbPulse{50%{opacity:.55}}
 @media (prefers-reduced-motion:reduce){.rb-shine,.rb-spark,.rb-glow{animation:none}.rb-spark{opacity:.8}}
 /* leaderboard */
-.lb{display:grid;gap:12px}
+.lb{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
 .lb-list{display:grid;gap:4px}
 .lb-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:16px}
 .lb-row.me{background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
@@ -4437,6 +4437,7 @@ function drawLeaderboard(){
       ${nameLockedUntil() ? `<p class="muted" style="margin:-4px 0 0;font-size:13px">You can change your username again ${nameWait()}.</p>` : (L.joined && me.username ? `<p class="muted" style="margin:-4px 0 0;font-size:13px">${(me.name_changes || 0) >= 1 ? 'After a change, you’ll have to wait 3 days to change it again.' : 'Your first name change is free. After that, once every 3 days.'}</p>` : '')}
       <textarea id="lbBio" class="lb-bio" maxlength="160" rows="3" placeholder="Bio (optional): your setup, favorite temp, anything">${esc(LB.bioDraft != null ? LB.bioDraft : (me.bio || ''))}</textarea>
       <p class="muted" style="margin:0;font-size:13px">Tied to your Puffco login${acct() && acct().email ? ` (${esc(acct().email)})` : ''}. Sign in with it on any phone and your profile comes back. Usernames are one per person.</p>
+      ${L.joined ? '' : '<p class="muted" style="margin:0;font-size:13px"><b style="color:var(--fg)">Heads up:</b> keep Emberline open during sessions or they won’t count. Path pauses the app in the background.</p>'}
       ${showcaseEditor()}
       <p class="acct-err" id="lbErr" ${LB.err ? '' : 'hidden'}>${esc(LB.err)}</p>
       <button class="btn primary" id="lbJoin" ${LB.busy ? 'disabled' : ''}>${LB.busy ? 'Saving…' : (L.joined ? 'Save profile' : 'Join the leaderboard')}</button>`;
@@ -4462,6 +4463,20 @@ function nameWait(){
   const h = Math.ceil(ms / 3600000);
   return h > 36 ? 'in ' + Math.ceil(h / 24) + ' days' : h > 1 ? 'in ' + h + ' hours' : 'in under an hour';
 }
+// ranked only counts what the app sees live, and Path pauses the app when it isn't on screen
+function keepOpenNotice(){
+  if (document.querySelector('.egg')) return;
+  const el = document.createElement('div'); el.className = 'egg';
+  el.innerHTML = `<div class="egg-card" role="dialog" aria-label="Keep Emberline open">
+    <svg viewBox="0 0 24 24" style="width:54px;height:54px;fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3M12 7v5l3 2"/></svg>
+    <h2>Keep Emberline open</h2>
+    <p>Sessions only count for ranked if Emberline is open on your screen while you use your Peak. Path, Puffco’s browser, pauses the app as soon as you leave it, so hits and blinkers can’t be tracked in the background.</p>
+    <p style="font-size:14px">Tip: the screen stays awake on its own while you heat up, so just leave it open.</p>
+    <button class="btn primary" id="koOk" style="width:100%">Got it</button></div>`;
+  document.body.appendChild(el); applyHaptics();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  el.querySelector('#koOk').onclick = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 260); };
+}
 async function lbSave(){
   const L = lbStore(), name = ($('#lbName').value || '').trim();
   if (!/^[A-Za-z0-9_.]{3,20}$/.test(name)){ LB.err = LB_ERRS.username_invalid; drawLeaderboard(); return; }
@@ -4481,6 +4496,7 @@ async function lbSave(){
       LB.edit = true; LB.pick = sent.slice(); LB.busy = false; drawLeaderboard(); return;
     }
     toast(wasJoined ? 'Profile saved' : 'You’re on the leaderboard');
+    if (!wasJoined) setTimeout(keepOpenNotice, 700);
     LB.busy = false; lbLoad();
   } catch(e){ LB.busy = false; LB.err = e.code === 'puffco_blocked' ? e.message : (LB_ERRS[e.code] || (/load failed|failed to fetch|network/i.test(e.message) ? 'Couldn’t reach the leaderboard server.' : 'Couldn’t save: ' + e.message)); drawLeaderboard(); }
 }
