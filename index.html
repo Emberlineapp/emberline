@@ -138,6 +138,14 @@ main{padding-top:var(--hdrH)!important}
 .batt i{display:block;width:25px;height:12px;border:1.5px solid color-mix(in srgb,var(--fg) 45%,transparent);border-radius:4px;position:relative;padding:1.5px}
 .batt i::after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:4px;border-radius:0 2px 2px 0;background:color-mix(in srgb,var(--fg) 45%,transparent)}
 .batt i b{display:block;height:100%;background:var(--good);border-radius:2px}
+.batt .bolt{position:absolute;left:50%;top:50%;width:9px;height:12px;transform:translate(-50%,-50%) scale(0);fill:#fff;stroke:#0d0b14;stroke-width:1.4;paint-order:stroke;transition:transform .35s var(--spring,ease)}
+.batt.chg .bolt{transform:translate(-50%,-50%) scale(1)}
+.batt.chg i b{background:var(--good)!important;animation:chgPulse 1.8s ease-in-out infinite}
+.batt.chg > span{color:var(--good)}
+@keyframes chgPulse{50%{opacity:.6}}
+.chg-line{display:inline-flex;align-items:center;gap:5px;color:var(--good);font-weight:600}
+.chg-line .bolt{width:9px;height:12px;fill:currentColor}
+@media (prefers-reduced-motion:reduce){.batt.chg i b{animation:none}}
 
 main{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:4px calc(120px + env(safe-area-inset-bottom,0px))}
 section.view{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
@@ -810,7 +818,7 @@ html.scrolling .ambient{animation-play-state:paused}
 .hz-host{position:relative}
 .hz{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;z-index:4;cursor:pointer;-webkit-appearance:auto;appearance:auto}
 .hz:disabled{pointer-events:none}
-.hz{touch-action:pan-y}
+.hz{touch-action:pan-y;-webkit-mask-image:linear-gradient(#0000,#0000);mask-image:linear-gradient(#0000,#0000);filter:opacity(0);background:transparent;color:transparent}
 .bv-art{position:relative}.bv-art>.hz{touch-action:none;border-radius:50%}
 #homeChips .hz,.seg.vap .hz,#nav .hz{touch-action:pan-y}
 /* ===== badge viewer ===== */
@@ -2617,6 +2625,13 @@ async function slowPoll(){
   try { S.chamber = await ble.u8('/p/htr/chmt'); } catch(e){}
   try { S.battery = clamp(Math.round(await ble.f32('/p/bat/soc')),0,100); } catch(e){}
   try { const c = await ble.u8('/p/bat/chg/stat'); S.charging = c === 0 || c === 1; } catch(e){}
+  if (S.charging){
+    try { const e2 = await ble.f32('/p/bat/chg/etf'); S.chgEta = isFinite(e2) && e2 > 0 && e2 < 86400 ? e2 : null; S.chgEtaAt = Date.now(); } catch(e){ S.chgEta = null; }
+    // backup guess from how fast the % is going up
+    const now = Date.now(); if (!S.chgRef || S.battery < S.chgRef.soc) S.chgRef = { t: now, soc: S.battery };
+    const dS = S.battery - S.chgRef.soc, dT = (now - S.chgRef.t) / 1000;
+    S.chgGuess = dS >= 2 && dT > 60 ? (100 - S.battery) * dT / dS : null;
+  } else { S.chgRef = null; S.chgEta = null; S.chgGuess = null; }
   try { S.odo = Math.round(await ble.f32('/p/app/odom/0/nc', 12)); }
   catch(e){ try { S.odo = Math.round(await ble.f32('/p/app/info/dtot', 12)); } catch(e2){} }
   try { S.dpd = await ble.f32('/p/app/info/dpd', 12); } catch(e){}
@@ -2972,6 +2987,13 @@ function applyHaptics(){
 }
 function render(){ if (raf) return; raf = requestAnimationFrame(() => { raf = 0; draw(); applyHaptics(); }); }
 
+function fmtDur(sec){ const m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm'; }
+const BOLT = '<svg class="bolt" viewBox="0 0 12 16" aria-hidden="true"><path d="M7 0 0 9h4.5L4 16l8-10H7.5z"/></svg>';
+function chargeLine(){
+  if (S.battery >= 100) return `<span class="chg-line">${BOLT}Fully charged</span>`;
+  const eta = S.chgEta != null ? S.chgEta - (Date.now() - (S.chgEtaAt || Date.now())) / 1000 : S.chgGuess;
+  return `<span class="chg-line">${BOLT}${eta && eta > 0 ? 'Full in ' + fmtDur(eta) : 'Charging'}</span>`;
+}
 function draw(){
   // header
   $('#devName').firstChild.textContent = S.mode === 'live' ? (S.devName || S.name) : 'Emberline';
@@ -2980,6 +3002,8 @@ function draw(){
   bt.querySelector('b').style.width = (S.battery || 0) + '%';
   bt.querySelector('b').style.background = S.battery < 20 ? 'var(--bad)' : S.battery < 40 ? 'var(--warn)' : 'var(--good)';
   bt.querySelector('span').textContent = S.battery + '%';
+  if (bt.classList.contains('chg') !== !!S.charging) bt.classList.toggle('chg', !!S.charging);
+  if (!bt.querySelector('.bolt')) bt.querySelector('i').insertAdjacentHTML('beforeend', BOLT);
   if (view === 'home') drawHome();
   if (view === 'stats'){
     // only rebuild the charts when the numbers changed; redrawing on every Bluetooth poll made scrolling stutter
@@ -3020,7 +3044,7 @@ function drawHome(){
   st.className = 'state-chip' + (live && (S.state === 7 || S.state === 9) ? ' heat' : live && S.state === 8 ? ' ready' : '');
   { const b = $('#bStart'), t = live ? 'Start' : 'Connect', n = [...b.childNodes].find(x => x.nodeType === 3); if (n){ if (n.nodeValue !== t) n.nodeValue = t; } else b.prepend(t); }
   const left = Math.max(0, Math.round(S.total - S.elapsed));
-  setHTML($('#gTimer'), S.state === 8 ? `${left}s left` : S.state === 7 ? 'Heating up…' : '&nbsp;');
+  setHTML($('#gTimer'), S.state === 8 ? `${left}s left` : S.state === 7 ? 'Heating up…' : live && S.charging ? chargeLine() : '&nbsp;');
   { const h = hitText(), g = $('#gHit'); if (g.innerHTML !== h) g.innerHTML = h; }
   const heating = S.state >= 7 && S.state <= 9;
   $('#bStart').disabled = (live && heating) || (live && S.chamber === 0) || (!live && (C.state === 'connecting' || C.state === 'reconnecting'));
