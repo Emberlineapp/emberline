@@ -137,6 +137,8 @@ main{padding-top:var(--hdrH)!important}
 .batt{font-family:var(--f-round);font-variant-numeric:tabular-nums}
 .batt i{display:block;width:25px;height:12px;border:1.5px solid color-mix(in srgb,var(--fg) 45%,transparent);border-radius:4px;position:relative;padding:1.5px}
 .batt i::after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:4px;border-radius:0 2px 2px 0;background:color-mix(in srgb,var(--fg) 45%,transparent)}
+#bCleaned{transition:background .25s ease,color .25s ease,border-color .25s ease}
+#bCleaned.arm{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,transparent)}
 .batt i b{display:block;height:100%;background:var(--good);border-radius:2px}
 .batt .bolt{position:absolute;left:50%;top:50%;width:9px;height:12px;transform:translate(-50%,-50%) scale(0);fill:#fff;stroke:#0d0b14;stroke-width:1.4;paint-order:stroke;transition:transform .35s var(--spring,ease)}
 .batt.chg .bolt{transform:translate(-50%,-50%) scale(1)}
@@ -2184,19 +2186,26 @@ async function afterConnect(quick){
   await detectLedApi();
   try { S.state = await ble.u8('/p/app/stat/id'); } catch(e){}
   connectIntro(); // the logo lights up now while the rest loads
-  await readProfiles();
-  await applyProfileBright(S.active);
-  await slowPoll();
-  await readDeviceInfo();
-  await readBatteryDetail();
-  if (store.cleanBaseOdo == null && S.odo != null){ store.cleanBaseOdo = S.odo - (store.localSince || 0); save(); }
+  try { S.active = clamp(await ble.u8('/p/app/hcs'), 0, 3); } catch(e){}
+  try { S.battery = clamp(Math.round(await ble.f32('/p/bat/soc')), 0, 100); } catch(e){}
   store.lastDeviceId = ble.dev.id; store.lastDeviceName = S.name;
   rememberDevice(); save();
-  S.readFor = ble.dev.id;
+  // show the app as connected right away (saved profile names/colors fill in instantly), then fill in the rest
   startPolling();
   setConnUI('live');
   toast('Connected to ' + (S.devName || S.name));
-  connectIntro();
+  try { const c = store.profPal && store.profPal[ble.dev.id]; if (c) c.forEach((x, i) => { const q = S.profiles[i]; if (x && q){ q.color = x.c || q.color; q.pal = x.pal; ['name','tempC','time','boostF','boostT','vapor'].forEach(k => { if (x[k] != null) q[k] = x[k]; }); } }); } catch(e){}
+  render();
+  const id = ble.dev.id;
+  (async () => {
+    try { await slowPoll(); render(); } catch(e){}
+    try { await readProfiles(); render(); if (view === 'prof') drawProfiles(); } catch(e){}
+    try { await applyProfileBright(S.active); } catch(e){}
+    try { await readDeviceInfo(); render(); } catch(e){}
+    try { await readBatteryDetail(); } catch(e){}
+    if (store.cleanBaseOdo == null && S.odo != null){ store.cleanBaseOdo = S.odo - (store.localSince || 0); save(); }
+    if (ble.dev && ble.dev.id === id) S.readFor = id;
+  })();
 }
 let hcsHold = 0;
 /* Peak light previews: same /p/app/led/pclr channel the Puffco app uses */
@@ -2603,7 +2612,7 @@ async function detectLedApi(){
 }
 
 async function readProfiles(){
-  try { const c = store.profPal && ble.dev && store.profPal[ble.dev.id]; if (c) c.forEach((x, i) => { if (x && S.profiles[i]){ S.profiles[i].color = x.c || S.profiles[i].color; S.profiles[i].pal = x.pal; } }); render(); } catch(e){}
+  try { const c = store.profPal && ble.dev && store.profPal[ble.dev.id]; if (c) c.forEach((x, i) => { if (x && S.profiles[i]){ const q = S.profiles[i]; q.color = x.c || q.color; q.pal = x.pal; ['name','tempC','time','boostF','boostT','vapor'].forEach(k => { if (x[k] != null) q[k] = x[k]; }); } }); render(); } catch(e){}
   for (let i=0;i<4;i++){
     const p = S.profiles[i];
     try { p.name = (await ble.str(`/u/app/hc/${i}/name`)) || p.name; } catch(e){}
@@ -2616,7 +2625,7 @@ async function readProfiles(){
     else { try { applyPalette(p, lightPalette(await ble.readAll(`/u/app/hc/${i}/colr`))); } catch(e){} }
   }
   // remember per device so the colors show instantly next time
-  try { if (ble.dev){ store.profPal = store.profPal || {}; store.profPal[ble.dev.id] = S.profiles.map(p => ({ c: p.color, pal: p.pal || null })); } } catch(e){}
+  try { if (ble.dev){ store.profPal = store.profPal || {}; store.profPal[ble.dev.id] = S.profiles.map(p => ({ c: p.color, pal: p.pal || null, name: p.name, tempC: p.tempC, time: p.time, boostF: p.boostF, boostT: p.boostT, vapor: p.vapor })); save(); } } catch(e){}
   try { S.active = clamp(await ble.u8('/p/app/hcs'),0,3); } catch(e){}
 }
 
@@ -4281,7 +4290,12 @@ $('#connBtn').addEventListener('click', () => {
 $('#bStart').onclick = () => S.mode === 'live' ? modeCmd(7) : startConnect(false);
 $('#bStop').onclick = () => modeCmd(8);
 $('#bBoost').onclick = () => modeCmd(9);
-$('#bCleaned').onclick = markCleaned;
+{ // first tap asks "Are you sure?" in the same button, second tap marks it
+  const bc = $('#bCleaned'); let armT = 0;
+  const label = t => { const n = [...bc.childNodes].find(x => x.nodeType === 3); if (n) n.nodeValue = t; else bc.prepend(t); };
+  const disarm = () => { clearTimeout(armT); armT = 0; bc.classList.remove('arm'); label('Mark cleaned'); };
+  bc.onclick = () => { if (armT){ disarm(); markCleaned(); } else { bc.classList.add('arm'); label('Are you sure?'); armT = setTimeout(disarm, 3500); } };
+}
 $('#homeChips').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) selectProfile(+b.dataset.p); });
 
 $('#profList').addEventListener('input', e => {
