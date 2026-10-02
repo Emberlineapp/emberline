@@ -3346,7 +3346,7 @@ let view = 'home', raf = 0;
 function setHTML(el, html){ if (el && el._h !== html){ el._h = html; el.innerHTML = html; } }
 
 /* haptics: only on the moments that matter (start/stop/boost, picking a profile or vapor level, saving lights, marking cleaned) */
-const HZ_SEL = '#bStart, #bStop, #bBoost, #bCleaned, #ltSave, #homeChips .pchip, .seg.vap button, .seg.hseg button, #nav > button, .bv-art, .soc-follow, .bv-close, .crop [data-c="ok"]';
+const HZ_SEL = '#bBoost, #bCleaned, #ltSave, #homeChips .pchip, .seg.vap button, .seg.hseg button, #nav > button, .bv-art, .soc-follow, .bv-close, .crop [data-c="ok"]';
 function applyHaptics(){
   if (document.documentElement.dataset.ui === 'cockpit') return;
   document.querySelectorAll('[data-bv] > .hz').forEach(x => x.remove());
