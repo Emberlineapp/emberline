@@ -2857,6 +2857,7 @@ async function detectLedApi(){
     const raw = await ble.u32('/p/sys/fw/api');
     S.series = (raw >>> 16) === 1 ? 'toad' : 'peach';   // same as Puffco's app: api series 1 = Proxy
     const api = raw & 0xffff;
+    if (S.series === 'toad'){ S.api = 3; return; } // Proxy counts its api versions separately: it always uses the newer light format
     if (api < 27){ S.api = 2; return; }
   } catch(e){}
   try { await ble.read('/u/app/hc/0/phcl', 8); S.api = 2; } catch(e){ S.api = 3; }
