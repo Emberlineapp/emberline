@@ -5116,7 +5116,7 @@ function zoneFrame(meta, t){
     switch (z.fx){
       case 'off': return '#000000';
       case 'pulse': return mixL('#000000', z.c, .06 + .94 * ease(wave));
-      case 'fade': return mixL(z.c, z.c2 || '#000000', ease(wave));
+      case 'fade': return mixL(z.c, z.c2 || '#000000', z.bias ? Math.pow(ease(wave), z.bias) : ease(wave)); // bias < 1 = stays on the 2nd color longer
       case 'rainbow': return hsv(((ph * .5) + i / 6) % 1);
       case 'strobe': return (ph * 2) % 1 < .5 ? z.c : '#000000';
       case 'flicker': { flick[i] = (flick[i] ?? .8) * .7 + (0.55 + Math.random() * 0.45) * .3; return mixL('#000000', z.c, flick[i]); }
@@ -5223,7 +5223,7 @@ const INTRO_ZONES = { motion:'still', tempoFrac:.5, zones:[
   { c:'#000000', fx:'off' },                            // base left: off
   { c:'#000000', fx:'off' },                            // glass right: off
   { c:'#5b009c', c2:'#0a84ff', fx:'pulse', sp:.07 },    // logo top
-  { c:'#ffffff', c2:'#64007d', fx:'fade',  sp:.14 },    // logo bottom
+  { c:'#ffffff', c2:'#64007d', fx:'fade',  sp:.25, bias:.25 },    // logo bottom: mostly purple, a quick flash of white
   { c:'#000000', fx:'off' },                            // base right: off
   { c:'#000000', fx:'off' } ] };                        // glass left: off  (only the logo lights up)
 let introDone = false;
@@ -5231,10 +5231,10 @@ function connectIntro(){
   if (introDone || S.mode !== 'live' || S.api === 2 || (S.state >= 7 && S.state <= 9) || zoneLive.on) return;
   introDone = true;
   const meta = JSON.parse(JSON.stringify(INTRO_ZONES));
-  meta.env = { in: 650, out: 9300, outMs: 700 }; // glide on fast, glide off at the end
-  zPh.length = 0; zClock.last = 0;
+  meta.env = { in: 500, out: 4300, outMs: 650 }; // 5 seconds: glide on fast, glide off at the end
+  zPh.length = 0; zClock.last = 0; zPh[3] = .5; // start on purple
   if (!zoneLiveStart(meta, true)) return;
-  setTimeout(() => { if (zoneLive.on && zoneLive.meta === meta) zoneLiveStop(true); }, 10050); // leave it alone if the zone editor took over
+  setTimeout(() => { if (zoneLive.on && zoneLive.meta === meta) zoneLiveStop(true); }, 5050); // leave it alone if the zone editor took over
 }
 
 function moodLamp(ref){
