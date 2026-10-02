@@ -2431,6 +2431,7 @@ async function afterConnect(quick){
     try { await readProfiles(); render(); if (view === 'prof') drawProfiles(); } catch(e){}
     try { await applyProfileBright(S.active); } catch(e){}
     try { await readDeviceInfo(); render(); } catch(e){}
+    try { await readSerial(); } catch(e){}
     try { await readBatteryDetail(); } catch(e){}
     if (store.cleanBaseOdo == null && S.odo != null){ store.cleanBaseOdo = S.odo - (store.localSince || 0); save(); }
     if (ble.dev && ble.dev.id === id) S.readFor = id;
@@ -2914,7 +2915,10 @@ function trackSession(prev, st){
     cur.peak = Math.max(cur.peak, tF);
     if (st === 8){ cur.hit = true; if (!cur.readyAt) cur.readyAt = Date.now(); }
     if ((st === 9 || st === 5 || st < 5) && prev >= 7 && prev <= 8){
-      if (cur.hit){ logSession({ t:cur.t, p:cur.p, name:cur.name, target:cur.target, peak:Math.round(cur.peak), dur:Math.round((Date.now()-cur.t)/1000), batt:cur.batt, hits:(cur.hits || HIT.hits).slice(0, 20), vapor:(S.profiles[cur.p] || {}).vapor, sc:sinceClean() + 1, run: cur.readyAt ? Math.round((Date.now() - cur.readyAt) / 1000) : null }); }
+      const ranFor = cur.readyAt ? (Date.now() - cur.readyAt) / 1000 : 0;
+      S.cyclesSinceOdo = (S.cyclesSinceOdo || 0) + 1;
+      const gotHit = (cur.hits || HIT.hits || []).some(h => h >= 1);
+      if (cur.hit && (ranFor >= 20 || gotHit)){ logSession({ t:cur.t, p:cur.p, name:cur.name, target:cur.target, peak:Math.round(cur.peak), dur:Math.round((Date.now()-cur.t)/1000), batt:cur.batt, hits:(cur.hits || HIT.hits).slice(0, 20), vapor:(S.profiles[cur.p] || {}).vapor, sc:sinceClean() + 1, run: cur.readyAt ? Math.round((Date.now() - cur.readyAt) / 1000) : null }); }
       cur = null;
     }
   }
@@ -3784,6 +3788,10 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const LB = { rows:null, me:null, err:'', busy:false, edit:false, avatar:null, lastPush:0, timer:null };
 function lbStore(){ if (!store.lb) store.lb = {}; return store.lb; }
 const lbMonth = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+async function sbRows(path){
+  if (!sbRows.noBan){ try { return await sbJSON(path + '&banned=is.false', { method:'GET' }); } catch(e){ if (e.status !== 400) throw e; sbRows.noBan = true; } }
+  return sbJSON(path, { method:'GET' });
+}
 async function sbJSON(path, opts = {}){
   const res = await fetch(SB_URL + path, Object.assign({}, opts, { headers: Object.assign({ apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' }, opts.headers || {}) }));
   let body = null; try { body = await res.json(); } catch(e){}
@@ -3791,12 +3799,34 @@ async function sbJSON(path, opts = {}){
   return body;
 }
 function lbUsesPuffco(){ const a = acct(); return !!(a && a.auth && a.auth.accessToken); } // ranked login = Puffco login
+// which Peak this is, for the dev page (serial when the Peak shares one, plus this phone's Bluetooth id for it)
+function devInfo(){
+  const d = ble.dev || null, id = (d && d.id) || store.lastDeviceId; if (!id) return undefined;
+  const ser = (store.devSerial || {})[id];
+  return { serial: ser || undefined, ble: String(id).replace(/[^A-Za-z0-9:._-]/g, '').slice(0, 80), model: S.edition || undefined, fw: S.fw || undefined };
+}
+async function readSerial(){
+  const id = ble.dev && ble.dev.id; if (!id) return;
+  store.devSerial = store.devSerial || {}; store.devSerialTried = store.devSerialTried || {};
+  if (store.devSerial[id] || store.devSerialTried[id]) return; // only look once per Peak
+  store.devSerialTried[id] = true; save();
+  const paths = ['/p/sys/hw/ser', '/p/sys/hw/sern', '/p/sys/hw/sn', '/p/sys/hw/uid', '/p/sys/uid', '/p/sys/hw/did', '/p/sys/id', '/p/sys/hw/mac', '/p/sys/bt/mac'];
+  for (const p of paths){
+    try {
+      const r = await ble.read(p, 32); if (!r || !r.length) continue;
+      const txt = new TextDecoder().decode(r).split('\0')[0].trim();
+      const val = /^[A-Za-z0-9:._-]{4,40}$/.test(txt) ? txt : [...r].map(b => b.toString(16).padStart(2, '0')).join('');
+      if (/^0+$|^f+$/i.test(val) || val.length < 4) continue;
+      store.devSerial[id] = val.slice(0, 64); store.devSerialPath = p; save(); return;
+    } catch(e){ if (/timed out/i.test(e.message || '')) return; } // a timeout means this Peak won't answer: stop, don't hold up live readings
+  }
+}
 async function lbCall(body){
   const send = async () => {
     if (!lbUsesPuffco()){ const e = new Error('Sign in to Puffco first'); e.code = 'puffco_required'; throw e; }
     const a = acct(); let pid = a.data && a.data.user && a.data.user.id;
     if (pid == null){ try { const me = await authed('/api/users/me'); pid = me && me.id; if (a.data && a.data.user && pid != null) a.data.user.id = pid; } catch(_){} } // phone-side Puffco check
-    const id = { puffcoToken: acct().auth.accessToken, puffcoId: pid };
+    const id = { puffcoToken: acct().auth.accessToken, puffcoId: pid, device: devInfo() };
     return sbJSON('/functions/v1/player', { method:'POST', body: JSON.stringify(Object.assign(id, body)) });
   };
   try { return await send(); }
@@ -3811,16 +3841,20 @@ async function lbCall(body){
     throw e;
   }
 }
-function lbPayload(){ const r = rankFor(data().sessions); return { rp: r.rp, tier: r.tier.n, blinkers: r.blinkers, month: lbMonth() }; }
+function lbPayload(){
+  const r = rankFor(data().sessions), m = lbMonth(), me = LB.me && LB.me.month === m ? LB.me : null;
+  const rp = Math.max(r.rp, me ? me.rp || 0 : 0), bl = Math.max(r.blinkers, me ? me.blinkers || 0 : 0);
+  return { rp, tier: rp > r.rp && me ? me.tier : r.tier.n, blinkers: bl, month: m };
+}
 async function lbPush(force){
   const L = lbStore(); if (!L.joined || !lbUsesPuffco()) return;
   if (!force && Date.now() - LB.lastPush < 60000) return;
   LB.lastPush = Date.now();
-  try { const r = await lbCall(lbPayload()); if (r && r.player){ LB.me = r.player; } } catch(e){}
+  try { const r = await lbCall(lbPayload()); if (r && r.player){ LB.me = r.player; lbStore().meCache = r.player; save(); } } catch(e){}
 }
 async function lbLoad(){
   try {
-    LB.rows = await sbJSON(`/rest/v1/players?select=*&month=eq.${lbMonth()}&order=rp.desc,updated_at.asc&limit=100`, { method:'GET' });
+    LB.rows = await sbRows(`/rest/v1/players?select=*&month=eq.${lbMonth()}&order=rp.desc,updated_at.asc&limit=100`);
     LB.err = '';
   } catch(e){ LB.err = 'Couldn’t load the leaderboard. Check your connection.'; }
   drawLeaderboard();
@@ -3840,7 +3874,7 @@ function lbResize(file){
     img.src = url;
   });
 }
-const LB_ERRS = { puffco_required:'Sign in to Puffco in Settings to join ranked.', username_invalid:'Usernames are 3 to 20 letters, numbers, _ or .', username_taken:'That username is taken.', username_required:'Pick a username first.', avatar_too_big:'That picture is too big.', puffco_auth:'Your Puffco sign-in expired. Sign in again in Settings.', auth:'Couldn’t sign you in. Try again.' };
+const LB_ERRS = { name_cooldown:'You can only change your username once every 3 days.', banned:'This account is banned from ranked and social. Ask in the Emberline Discord if you think this is a mistake.', puffco_required:'Sign in to Puffco in Settings to join ranked.', username_invalid:'Usernames are 3 to 20 letters, numbers, _ or .', username_taken:'That username is taken.', username_required:'Pick a username first.', avatar_too_big:'That picture is too big.', puffco_auth:'Your Puffco sign-in expired. Sign in again in Settings.', auth:'Couldn’t sign you in. Try again.' };
 
 /* ---- badge showcase: up to 3 badges on your profile ---- */
 function showBadge(key, size, row){
@@ -4272,7 +4306,7 @@ async function socCounts(pid){
 const SOC_COLS = 'id,username,avatar_url,tier,rp,blinkers,dev,showcase,bio,month';
 async function socPlayers(ids){
   if (!ids.length) return [];
-  try { return await sbJSON(`/rest/v1/players?select=${SOC_COLS}&id=in.(${ids.slice(0, 200).join(',')})`, { method:'GET' }); } catch(e){ return []; }
+  try { return await sbRows(`/rest/v1/players?select=${SOC_COLS}&id=in.(${ids.slice(0, 200).join(',')})`); } catch(e){ return []; }
 }
 async function socLoad(){
   drawSocial();
@@ -4324,9 +4358,12 @@ function socRow(r){
 }
 function drawSocial(){
   const meEl = $('#socMe'); if (!meEl) return;
-  const puff = lbUsesPuffco(), me = LB.me;
+  const puff = lbUsesPuffco(), me = LB.me || (lbStore().joined ? lbStore().meCache : null); // last known profile shows instantly while it reloads
   if (!puff){
     setHTML(meEl, `<span class="label">Your profile</span><div class="banner" style="padding:12px 14px"><div class="grow"><b>Sign in to join Social</b>Your Emberline profile uses your Puffco login. Sign in to make a profile, follow people and show your badges.</div><button class="btn small primary" id="lbGoSign">Sign in</button></div>`);
+  } else if ((!me || !me.username) && lbStore().joined){
+    setHTML(meEl, `<span class="label">Your profile</span><p class="muted" style="margin:0">${LB.meErr ? 'Couldn’t load your profile: ' + esc(LB.meErr) : 'Loading your profile…'}</p><button class="btn" id="socRetry">Try again</button>`);
+    const rb = $('#socRetry'); if (rb) rb.onclick = () => { LB.meErr = ''; drawSocial(); lbRestore(); };
   } else if (!me || !me.username){
     setHTML(meEl, `<span class="label">Your profile</span><p class="muted" style="margin:0">Make a profile with a username, photo and bio. People can find you, follow you and see your badges.</p><button class="btn primary" id="socCreate">Create your profile</button>`);
   } else {
@@ -4363,7 +4400,7 @@ function socDrawFollowing(){
     drawSocial();
     const my = ++seq;
     t = setTimeout(async () => {
-      try { const rows = await sbJSON(`/rest/v1/players?select=${SOC_COLS}&username=ilike.*${encodeURIComponent(q)}*&order=rp.desc&limit=20`, { method:'GET' }); if (my === seq){ SOC.results = rows; drawSocial(); } }
+      try { const rows = await sbRows(`/rest/v1/players?select=${SOC_COLS}&username=ilike.*${encodeURIComponent(q)}*&order=rp.desc&limit=20`); if (my === seq){ SOC.results = rows; drawSocial(); } }
       catch(err){ if (my === seq){ SOC.results = []; drawSocial(); } }
     }, 280);
   });
@@ -4395,8 +4432,9 @@ function drawLeaderboard(){
       <p class="muted" style="margin:0;font-size:14px">${L.joined ? 'Edit your profile.' : 'Show your rank to everyone using Emberline. Pick a username and a picture.'}</p>
       <div class="lb-form">
         <label class="lb-pic" for="lbPicFile"><span class="lb-pic-av">${LB.avatar ? `<img class="lb-av" src="${LB.avatar}" alt="" style="width:64px;height:64px">` : lbAvatar(me.avatar_url, me.username || L.username, 64)}<span class="pdot-pen lb-pic-pen" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></span></span><span>Photo</span></label>
-        <input type="text" id="lbName" maxlength="20" placeholder="Username" autocomplete="nickname" value="${esc(me.username || L.username || '')}">
+        <input type="text" id="lbName" maxlength="20" placeholder="Username" autocomplete="nickname" value="${esc(me.username || L.username || '')}" ${nameLockedUntil() ? 'readonly' : ''}>
       </div>
+      ${nameLockedUntil() ? `<p class="muted" style="margin:-4px 0 0;font-size:13px">You can change your username again ${nameWait()}.</p>` : (L.joined && me.username ? `<p class="muted" style="margin:-4px 0 0;font-size:13px">${(me.name_changes || 0) >= 1 ? 'After a change, you’ll have to wait 3 days to change it again.' : 'Your first name change is free. After that, once every 3 days.'}</p>` : '')}
       <textarea id="lbBio" class="lb-bio" maxlength="160" rows="3" placeholder="Bio (optional): your setup, favorite temp, anything">${esc(LB.bioDraft != null ? LB.bioDraft : (me.bio || ''))}</textarea>
       <p class="muted" style="margin:0;font-size:13px">Tied to your Puffco login${acct() && acct().email ? ` (${esc(acct().email)})` : ''}. Sign in with it on any phone and your profile comes back. Usernames are one per person.</p>
       ${showcaseEditor()}
@@ -4413,6 +4451,17 @@ function drawLeaderboard(){
     <p class="muted" style="margin:0;font-size:12px">Updates live. Resets on the 1st.</p>
     ${acct() && acct().email ? `<p class="muted lb-linked">@${esc((LB.me && LB.me.username) || L.username || '')} is linked to ${esc(acct().email)}</p>` : ''}`;
 }
+// usernames: first change is free, then once every 3 days (the server checks this too)
+function nameLockedUntil(){
+  const me = LB.me; if (!me || !me.username || (me.name_changes || 0) < 1 || !me.name_changed_at) return 0;
+  const until = new Date(me.name_changed_at).getTime() + 3 * 86400000;
+  return until > Date.now() ? until : 0;
+}
+function nameWait(){
+  const ms = nameLockedUntil() - Date.now(); if (ms <= 0) return 'now';
+  const h = Math.ceil(ms / 3600000);
+  return h > 36 ? 'in ' + Math.ceil(h / 24) + ' days' : h > 1 ? 'in ' + h + ' hours' : 'in under an hour';
+}
 async function lbSave(){
   const L = lbStore(), name = ($('#lbName').value || '').trim();
   if (!/^[A-Za-z0-9_.]{3,20}$/.test(name)){ LB.err = LB_ERRS.username_invalid; drawLeaderboard(); return; }
@@ -4424,7 +4473,7 @@ async function lbSave(){
     // the server drops badges it doesn't know; if that happened, say why instead of failing silently
     const sent = body.showcase || [], kept = (r.player && r.player.showcase) || [], lost = sent.filter(k => !kept.includes(k));
     const bioLost = body.bio && r.player && r.player.bio == null;
-    LB.me = r.player; LB.pick = null; LB.bioDraft = null; try { drawRank(); drawSocial(); } catch(_){} L.joined = true; L.username = name; LB.avatar = null; LB.edit = false; save();
+    LB.me = r.player; lbStore().meCache = r.player; LB.pick = null; LB.bioDraft = null; try { drawRank(); drawSocial(); } catch(_){} L.joined = true; L.username = name; LB.avatar = null; LB.edit = false; save();
     if (lost.length || bioLost){
       LB.err = (lost.some(k => k.startsWith('sp:')) || bioLost)
         ? 'Saved, but the server didn’t keep ' + (lost.length ? 'your new badges' : 'your bio') + '. Update the player function in Supabase (paste the newest player-function.ts and Deploy), and run add-social.sql.'
@@ -4464,18 +4513,18 @@ function lbRestore(){
   lbRestoring = lbCall({ action:'me' }).then(r => {
     const L = lbStore(), p = r && r.player;
     if (p){
-      LB.me = p; L.joined = true; L.dev = !!p.dev;
+      LB.me = p; L.joined = true; L.dev = !!p.dev; L.meCache = p;
       if (p.username) L.username = p.username;
       L.email = (acct() && acct().email) || L.email; save();
-      try { drawLeaderboard(); drawRank(); } catch(e){}
+      try { drawLeaderboard(); drawRank(); drawSocial(); } catch(e){}
       try { if (view === 'set') drawSettings(); } catch(e){}
-    }
+    } else if (r && 'player' in r){ L.joined = false; L.meCache = null; save(); try { drawSocial(); drawLeaderboard(); } catch(e){} } // the server says there's no profile for this login
     return p;
-  }).catch(() => null).finally(() => { lbRestoring = null; });
+  }).catch(e => { LB.meErr = (e && (LB_ERRS[e.code] || e.message)) || 'unknown error'; try { drawSocial(); } catch(_){} return null; }).finally(() => { lbRestoring = null; });
   return lbRestoring;
 }
 function lbStart(){ // called when Stats opens: load now, refresh every 30s while open
-  if (lbUsesPuffco() && !LB.me){ lbRestore(); } else if (lbStore().joined && !LB.me) lbCall({ action:'me' }).then(r => { LB.me = r.player; if (r.player){ lbStore().dev = !!r.player.dev; if (r.player.username) lbStore().username = r.player.username; save(); } drawLeaderboard(); try { drawRank(); } catch(e){} }).catch(() => {});
+  if (lbUsesPuffco() && !LB.me){ lbRestore(); } else if (lbStore().joined && !LB.me) lbCall({ action:'me' }).then(r => { LB.me = r.player; if (r.player){ lbStore().dev = !!r.player.dev; if (r.player.username) lbStore().username = r.player.username; lbStore().meCache = r.player; save(); } drawLeaderboard(); try { drawRank(); drawSocial(); } catch(e){} }).catch(() => {});
   lbPush(); lbLoad();
   clearInterval(LB.timer);
   LB.timer = setInterval(() => { if (view !== 'stats' && view !== 'social'){ clearInterval(LB.timer); return; } if (!document.hidden) lbLoad(); }, 30000);
