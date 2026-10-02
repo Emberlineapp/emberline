@@ -2955,7 +2955,7 @@ function logSession(s){
   if (ble.dev && S.mode === 'live'){ s.dev = ble.dev.id; s.series = S.series || 'peach'; }
   if (!demo && acctId()) s.acct = acctId();
   const d = data();
-  let rankBefore = null; try { rankBefore = rankFor(rankSessions()); } catch(e){}
+  let rankBefore = null; try { rankBefore = myRank(); } catch(e){}
   d.sessions.push(s);
   try { skinCelebrate(s); } catch(e){}
   if (demo){ demo.since++; }
@@ -3740,7 +3740,7 @@ function sessionPop(s, gained){
 }
 function afterSessionLogged(s, before){
   try {
-    const after = rankFor(rankSessions());
+    const after = myRank();
     const gained = after.rp - before.rp;
     if (view === 'home') sessionPop(s, gained); else toast(`Session done · ${gained > 0 ? '+' : ''}${gained} RP`);
     const bi = RANK_TIERS.findIndex(t => t.n === before.tier.n), ai = RANK_TIERS.findIndex(t => t.n === after.tier.n);
@@ -3775,10 +3775,20 @@ function rankFor(sessions, when){
   r.reset = new Date(m1);
   return r;
 }
+// your rank this month: from this phone's sessions, but never below what the leaderboard already has for you
+// (sessions from another phone or site still count)
+function myRank(){
+  const r = rankFor(rankSessions()), me = demo ? null : (LB.me || lbStore().meCache);
+  if (me && me.month === lbMonth() && (me.rp || 0) > r.rp){
+    const rp = me.rp;
+    return Object.assign({}, r, { rp, blinkers: Math.max(r.blinkers, me.blinkers || 0), tier: RANK_TIERS.slice().reverse().find(t => rp >= t.min), next: RANK_TIERS.find(t => t.min > rp) || null, synced: true });
+  }
+  return r;
+}
 function drawRank(){ drawRankInner(); applyHaptics(); }
 function drawRankInner(){
   const el = $('#rankCard'); if (!el) return;
-  const r = rankFor(rankSessions()), t = r.tier, nx = r.next;
+  const r = myRank(), t = r.tier, nx = r.next;
   const pct = nx ? Math.round((r.rp - t.min) / (nx.min - t.min) * 100) : 100;
   const dirtyNow = sinceClean() > RANK_DIRTY;
   el.style.setProperty('--tc', t.c);
@@ -3870,7 +3880,7 @@ async function lbCall(body){
   }
 }
 function lbPayload(){
-  const r = rankFor(rankSessions()), m = lbMonth(), me = LB.me && LB.me.month === m ? LB.me : null;
+  const r = myRank(), m = lbMonth(), me = LB.me && LB.me.month === m ? LB.me : null;
   const rp = Math.max(r.rp, me ? me.rp || 0 : 0), bl = Math.max(r.blinkers, me ? me.blinkers || 0 : 0);
   return { rp, tier: rp > r.rp && me ? me.tier : r.tier.n, blinkers: bl, month: m };
 }
@@ -3930,7 +3940,7 @@ function earnedBadges(){
 }
 function showcaseEditor(){
   if (!LB.pick) LB.pick = ((LB.me && LB.me.showcase) || []).slice(0, 3);
-  const row = { tier: rankFor(rankSessions()).tier.n }, earned = earnedBadges(), P = LB.pick;
+  const row = { tier: myRank().tier.n }, earned = earnedBadges(), P = LB.pick;
   return `<div class="row between"><span class="label">Showcase badges</span><span class="muted" style="font-size:13px">${P.length} / 3</span></div>
     <div class="sc-slots">${[0,1,2].map(i => P[i] ? `<button class="sc-slot filled" data-scrm="${i}" aria-label="Remove ${esc(showName(P[i], row))}"><span class="sc-n">${i+1}</span><span class="sc-x">✕</span>${showBadge(P[i], undefined, row)}</button>` : `<div class="sc-slot"><span class="sc-n">${i+1}</span><span class="sc-plus">+</span></div>`).join('')}</div>
     <p class="muted" style="margin:0;font-size:13px">Tap badges you’ve earned to add them. Tap a slot to remove one, or swipe it sideways to change the order.</p>
@@ -4397,10 +4407,10 @@ function drawSocial(){
   } else {
     const c = SOC.myCounts, sc = me.showcase || [];
     setHTML(meEl, `<div class="soc-head">${lbAvatar(me.avatar_url, me.username, 72)}<div class="soc-id"><b>${esc(me.username)}${me.dev ? devBadge(22) : ''}</b>
-        <span class="muted"><span style="color:${lbTierColor(rankFor(rankSessions()).tier.n)};font-weight:700">${rankFor(rankSessions()).tier.n}</span> · ${rankFor(rankSessions()).rp} RP</span>
+        <span class="muted"><span style="color:${lbTierColor(myRank().tier.n)};font-weight:700">${myRank().tier.n}</span> · ${myRank().rp} RP</span>
         <div class="soc-counts"><span><b data-cnt="followers">${c ? c.followers : '–'}</b> followers</span><span><b data-cnt="following">${c ? c.following : '–'}</b> following</span></div></div></div>
       ${me.bio ? `<p class="soc-bio">${esc(me.bio)}</p>` : '<p class="muted" style="margin:0;font-size:14px">No bio yet.</p>'}
-      ${sc.length ? `<div class="lbp-shelf">${sc.map(k => `<div data-bv="${bvResolve(k, { tier: rankFor(rankSessions()).tier.n })}">${showBadge(k, undefined, { tier: rankFor(rankSessions()).tier.n })}<span>${esc(showName(k, { tier: rankFor(rankSessions()).tier.n }))}</span></div>`).join('')}</div>` : ''}
+      ${sc.length ? `<div class="lbp-shelf">${sc.map(k => `<div data-bv="${bvResolve(k, { tier: myRank().tier.n })}">${showBadge(k, undefined, { tier: myRank().tier.n })}<span>${esc(showName(k, { tier: myRank().tier.n }))}</span></div>`).join('')}</div>` : ''}
       <button class="btn" id="socEdit">Edit profile</button>`);
   }
   // search results
@@ -5785,7 +5795,7 @@ function drawAccount(){
   const el = $('#acctCard'); if (!el) return;
   const a = acct();
   el.innerHTML = `<span class="label">Puffco account</span>` + (a && a.data
-    ? `${acctSummary()}<div class="shop-actions">${a.auth ? '<button class="btn small primary" id="acSync">Sync now</button>' : ''}<label class="btn small" for="acFile2" hidden>Import from file<input type="file" id="acFile2" accept=".har,application/json" hidden></label><button class="btn small ghost" id="acOut" style="color:var(--bad)">Sign out</button></div>`
+    ? `${acctSummary()}<div class="shop-actions">${a.auth ? '<button class="btn small primary" id="acSync">Sync now</button>' : ''}<label class="btn small" for="acFile2" hidden>Import from file<input type="file" id="acFile2" accept=".har,application/json" hidden></label>${(store.sessions || []).some(x => !x.acct) && store.sessOwner !== acctId() ? '<button class="btn small" id="acClaim">Count this phone’s old sessions</button>' : ''}<button class="btn small ghost" id="acOut" style="color:var(--bad)">Sign out</button></div>`
     : `<p class="muted" style="margin:0;font-size:14px">Link your Puffco account to bring in your saved moods, heat profiles and dab stats.</p>${acctFormHtml('ac')}`);
 }
 async function runAcct(prefix, fn){
@@ -6244,6 +6254,7 @@ $('#devCard').addEventListener('change', async e => {
 
 $('#acctCard').addEventListener('click', async e => {
   if (e.target.id === 'acOut'){ signOut(); wireAcctForm('ac'); return; }
+  if (e.target.id === 'acClaim'){ const id = acctId(); if (!id) return; store.sessOwner = null; if (store.claimAsked) delete store.claimAsked[id]; save(); claimPrompt(); return; }
   if (e.target.id === 'acSync'){ e.target.disabled = true; e.target.textContent = 'Syncing…'; try { await puffcoSync(); } catch(err){ toast(err.message); } drawAccount(); }
 });
 $('#acctCard').addEventListener('change', async e => {
