@@ -48,7 +48,7 @@ window.emberSplashNote=function(txt){var n=document.getElementById('splNote');if
 function onLoad(){loaded=true;check();setInterval(check,150)}
 if(document.readyState==='complete')onLoad();else window.addEventListener('load',onLoad);setTimeout(hide,7000)})();</script>
 <title>Emberline</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Saira+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Saira+Semi+Condensed:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&family=Silkscreen:wght@400;700&family=Anton&family=Barlow+Condensed:wght@500;600;700&display=swap">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#14121c">
 <style>
@@ -1285,13 +1285,237 @@ body.lt-open main{padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))!i
 .gs-flakes{position:absolute;inset:0;pointer-events:none}
 .gs-flakes i{position:absolute;top:-10px;left:var(--x);width:7px;height:11px;border-radius:2px;background:linear-gradient(180deg,#fff2c4,#d6a33a);transform:scale(var(--s));animation:flake 2.4s var(--d) cubic-bezier(.3,.6,.4,1) both}
 @keyframes flake{from{transform:translateY(-20px) rotate(0) scale(var(--s));opacity:1}to{transform:translateY(520px) rotate(540deg) scale(var(--s));opacity:0}}
+
+/* ===================== SECRET SKINS (unlocked by tapping Settings 5 times) ===================== */
+/* ---------- BLOCK: blocky survival game GUI ---------- */
+:root[data-ui="block"]{
+  --mc-dirt:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAACDklEQVR42k1SwWrbQBB9thXLirRobYyUiApUm4AxpDW0FHwopPQW8Lk/ke/JOZ+Re84+pAZfgrGoQbYc2Vp1pa6lENzDQMgelpmd2bdv573a7c21yEtZKN/l/fPOYr2fh1tmNK9Gvbv7KYDLvgdAFoqZhixUXeQlt3SpqlUs7u6nIi+Z0WSmAQDA988fZaGiJJOq4pbuu1wD8PC4DM7aBMYtncqyUMFZW+QlAIJYxQJAnfp8lxPqPNxOxoPJeBBu0nCTRkkG4GrUmy2iq1FPqqrhsNY2lX9i4XaYLJR+0tjJw3qfb1MJ4NePT6/HY5qreq22kwd22qrd3lwT3Xm49bo2AG7plO6ygr5BU5GqGgaORjMJNykAr2tHScYth2La5+GWEL2uLfKy7nXtt5lEScaM5ioWBDkMHG7pXteejAfUIAvV+HZxvvv77+vgg22dhuu9yA++25ktIt/tPKf5ETVZqNkyHgZOq6nZVksjeFIjOGsz06Bgtoho1u+XyEsNwNsd3+UiLx8el1RmphElGfGZPq2JkkaaU0IGIWA6HAYOtdIKN2mdmcaXi3MAUlVSVQRPtpGFInXJHVGSXfa9xs9RT1Uvh+rVd+xD+cItQ6oKxyMA3+W/F+tTXWOm4Tv2iabJQtW5pb8nzUxjMh5QQEaiF1axII9qq1iQlm+16dM6SjKSmbwNYLaIfJcD+A/ttjPCKQyP+wAAAABJRU5ErkJggg==);
+  --mc-stone:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAABsUlEQVR42k1Ssa4jIQz07XOeFYEUqlCQhiLaLTZ9Pi2fmq1SUVBE60hYirVEusK66KgADx7PDH9ut1uMEQCYWURSSqWUlBIz55zXdWXmWmuMUURaawgAtVYiUlVEZGb4tx6Ph0FDCCLinEPEgYhijKoKADHGWisAlFIAQES89yLCzK01ESGiwc4AQETW78tgLVNK3nvvfWsNANA5Z2VVtcHsRkQQMcbIzF8MAAxWA4Deu6oag6F77zahiJhiABhyzohor4loWRZDE5FzzixqrTnnQgghhGFd12maiGieZ5OOiNM0Ga33HgAMSkQA8HO9Xmutz+dz2zZEFJH3+71t2/F4fL1e+/3ee//5fHrvAPB+vweb0jrZJoRgORpIRHrvRlhrHcZxJCKTYelYqLXWeZ5DCCml1lpKyRr9XC6X39/f8/lcSmmtnU4n+xqqutvtlmVR1ZwzM79er8PhMJjH9/sdEb33hi6lOOdqreM4GiCE0HsPIQwAkHM2ASklmx4RQwjfTJiZmVNKy7Kgqt7vd7OslGJimNlS/19ezjnGOFjGOeevOV9DjNY8cM6t66qqfwHSDTA/ETij0AAAAABJRU5ErkJggg==);
+  --mc-btn:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAABHElEQVR42lWSu47EIAxF76LIVLiiyrfO91JR2RWupjgSmk0Rhdjcl/33+XwkScrM3vs5RxJvSXPOvTf/+W6ZudbKzDFGRNBdVZLcfa0lqfcuae/t7o8kM8tMSVXVe6c85wTlUlVVRDywm5mkMQbU+v/ADFZz9+sBEniu9DEGnGOMzHzAhoQCNgDChpkh6X3ftvemMOe8pn+VoLCqzjmZ2dydQ1W5+68Gjmbm7tdGAw+7EeHue++IMLNftXRHxAPYWosEkUsGmXnTvFk/wF8SpgMtNwkASRHRUE9k7g4va3LF3J45Z8vMvTcdwICNXUq0Unre90Ul1OccpjbGIHEzY6MY1EM34dwJ3BW6q0UpM9v1dElxzxwAhj8zzewLb0sbS5RGEZkAAAAASUVORK5CYII=);
+  --f-body:"Pixelify Sans","Silkscreen",ui-monospace,monospace;
+  --f-display:"Silkscreen","Pixelify Sans",ui-monospace,monospace;
+  --f-round:"Pixelify Sans",ui-monospace,monospace;
+  --f-mono:"Pixelify Sans",ui-monospace,monospace;
+  --r:0px; --r-sm:0px;
+  --mc-panel:#c6c6c6; --mc-ink:#3f3f3f; --mc-slot:#8b8b8b;
+  --glass:var(--mc-panel); --glass-strong:var(--mc-panel); --glass-edge:#000; --glass-hi:#fff;
+  --fill:#8b8b8b; --fill-2:#7a7a7a; --track:#373737; --sep:#8b8b8b;
+  color-scheme:dark;
+}
+:root[data-ui="block"] body{background:linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)),var(--mc-dirt) 0 0/64px 64px #2a1f15!important;image-rendering:pixelated;letter-spacing:0;-webkit-font-smoothing:none}
+:root[data-ui="block"] body{background-attachment:fixed!important}
+:root[data-ui="block"] .ambient{display:none}
+:root[data-ui="block"] header::before{background:linear-gradient(180deg,rgba(20,14,9,.95) 0 70%,rgba(20,14,9,0))}
+:root[data-ui="block"] .largetitle{font:700 34px/1.05 var(--f-display);letter-spacing:.02em;color:transparent;background:var(--mc-stone) 0 0/48px 48px;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(3px 3px 0 #1d1d1d) drop-shadow(0 0 1px #000)}
+:root[data-ui="block"] .subhead{color:#e0e0e0;text-shadow:2px 2px 0 #3f3f3f}
+/* inventory panels */
+:root[data-ui="block"] .card,:root[data-ui="block"] .egg-card,:root[data-ui="block"] .tile,:root[data-ui="block"] .banner,:root[data-ui="block"] .wl-card{
+  --fg:var(--mc-ink); --muted:#555; --line:#8b8b8b; --accent-soft:#8b8b8b;
+  color:var(--mc-ink);background:var(--mc-panel)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;border:2px solid #000!important;border-radius:3px!important;
+  box-shadow:inset 2px 2px 0 #fff,inset -2px -2px 0 #555!important}
+:root[data-ui="block"] .banner.warn{background:#e8d27a!important}
+:root[data-ui="block"] .banner.bad{background:#e08a7a!important}
+:root[data-ui="block"] .label{color:#404040;font:700 12px var(--f-display);letter-spacing:.06em}
+:root[data-ui="block"] .muted{color:#555}
+/* stone buttons */
+:root[data-ui="block"] .btn,:root[data-ui="block"] .btn.primary,:root[data-ui="block"] .btn.primary.pc,:root[data-ui="block"] .btn.ghost{
+  font:700 17px var(--f-body);color:#fff!important;text-shadow:2px 2px 0 #3f3f3f;background:var(--mc-btn) 0 0/32px 32px!important;border:2px solid #000!important;border-radius:0!important;
+  box-shadow:inset 2px 2px 0 #aaa,inset -2px -3px 0 #555!important;transition:none}
+:root[data-ui="block"] .btn.primary,:root[data-ui="block"] .btn.primary.pc{background:linear-gradient(color-mix(in srgb,var(--pc,var(--accent)) 38%,transparent),color-mix(in srgb,var(--pc,var(--accent)) 38%,transparent)),var(--mc-btn) 0 0/32px 32px!important;font-size:19px}
+:root[data-ui="block"] .btn:hover:not(:disabled),:root[data-ui="block"] .btn:focus-visible{border-color:#fff!important;color:#ffffa0!important;outline:none}
+:root[data-ui="block"] .btn:active:not(:disabled){transform:none;box-shadow:inset 2px 2px 0 #555,inset -2px -2px 0 #aaa!important}
+:root[data-ui="block"] .btn:disabled{opacity:1;background:#2c2c2c!important;color:#a0a0a0!important;text-shadow:none;box-shadow:none!important}
+/* header */
+:root[data-ui="block"] header .navbtn{background:var(--mc-btn) 0 0/32px 32px!important;border:2px solid #000;border-radius:0;box-shadow:inset 2px 2px 0 #aaa,inset -2px -3px 0 #555;color:#fff;text-shadow:2px 2px 0 #3f3f3f;height:40px}
+:root[data-ui="block"] .brand{text-shadow:2px 2px 0 #000;color:#fff}
+:root[data-ui="block"] .brand small{color:#c8c8c8}
+:root[data-ui="block"] .pill.on .dot{background:#55ff55;box-shadow:0 0 0 2px #000;border-radius:0}
+:root[data-ui="block"] .dot{border-radius:0}
+:root[data-ui="block"] #batt i{display:none}
+:root[data-ui="block"] #batt > span:not(.skin-hearts){display:none}
+:root[data-ui="block"] #batt{padding:0 8px;gap:0;background:transparent!important;border:0;box-shadow:none}
+.skin-hearts{display:none}
+:root[data-ui="block"] .skin-hearts{display:flex;gap:0}
+.skin-hearts img{width:11px;height:11px;image-rendering:pixelated}
+:root[data-ui="block"] #connBtn{font-size:14px;padding:0 10px}
+/* inventory slots: profile chips, segmented controls */
+:root[data-ui="block"] .chips{background:transparent;padding:0;gap:4px;border-radius:0}
+:root[data-ui="block"] .pchip,:root[data-ui="block"] .seg button{background:var(--mc-slot);border:2px solid;border-color:#373737 #fff #fff #373737;border-radius:0;color:#fff;text-shadow:2px 2px 0 #3f3f3f}
+:root[data-ui="block"] .pchip span{color:#fff;font:600 14px var(--f-body)}
+:root[data-ui="block"] .pchip .sw{border-radius:0;box-shadow:0 0 0 1px #000}
+:root[data-ui="block"] .pchip[aria-pressed="true"],:root[data-ui="block"] .seg button[aria-pressed="true"]{background:#a6a6a6;outline:3px solid #fff;outline-offset:-1px;box-shadow:none;position:relative;z-index:3}
+:root[data-ui="block"] .seg{background:transparent;padding:0;gap:3px;border-radius:0}
+:root[data-ui="block"] .gd-lens{display:none!important}
+/* durability bars */
+:root[data-ui="block"] .meter{height:8px;border-radius:0;background:#000;border:2px solid #000}
+:root[data-ui="block"] .meter b{border-radius:0;background:#55ff55}
+/* gauge: XP-level number */
+:root[data-ui="block"] .gauge .track{stroke:#373737}
+:root[data-ui="block"] .gauge circle{stroke-linecap:butt}
+:root[data-ui="block"] .gauge-temp{font:700 clamp(50px,15vw,66px)/1 var(--f-display);color:#80ff20;letter-spacing:0;text-shadow:3px 0 0 #000,-3px 0 0 #000,0 3px 0 #000,0 -3px 0 #000,3px 3px 0 #000}
+:root[data-ui="block"] .gauge-temp sup{color:#80ff20}
+:root[data-ui="block"] .state-chip{border-radius:0;background:var(--mc-slot)!important;color:#fff!important;text-shadow:2px 2px 0 #3f3f3f;border:2px solid;border-color:#373737 #fff #fff #373737}
+:root[data-ui="block"] .gauge-wrap::before{display:none}
+/* text fields */
+:root[data-ui="block"] input[type=text],:root[data-ui="block"] input[type=number],:root[data-ui="block"] input[type=email],:root[data-ui="block"] input[type=password],:root[data-ui="block"] input[type=search],:root[data-ui="block"] textarea{background:#000!important;color:#fff!important;border:2px solid #a0a0a0!important;border-radius:0!important;font-family:var(--f-body)!important}
+:root[data-ui="block"] .switch{border-radius:0;background:#2c2c2c;box-shadow:inset 0 0 0 2px #000}
+:root[data-ui="block"] .switch::after{border-radius:0;background:var(--mc-btn) 0 0/16px 16px;box-shadow:inset 2px 2px 0 #aaa,inset -2px -2px 0 #555,0 0 0 2px #000}
+:root[data-ui="block"] .switch:checked{background:#55aa22}
+:root[data-ui="block"] input[type=range]::-webkit-slider-runnable-track{height:20px;border-radius:0;background:#000;box-shadow:inset 0 0 0 2px #555}
+:root[data-ui="block"] input[type=range]::-webkit-slider-thumb{width:12px;height:24px;border-radius:0;margin-top:-2px;background:var(--mc-btn) 0 0/16px 16px;box-shadow:inset 2px 2px 0 #aaa,inset -2px -2px 0 #555,0 0 0 2px #000}
+:root[data-ui="block"] .scheme{border-radius:0;background:var(--mc-slot);border:2px solid;border-color:#373737 #fff #fff #373737;color:#fff;text-shadow:2px 2px 0 #3f3f3f}
+:root[data-ui="block"] .scheme .bars{border-radius:0}
+/* hotbar */
+:root[data-ui="block"] nav::before{background:linear-gradient(to top,rgba(0,0,0,.7),transparent)!important}
+:root[data-ui="block"] nav .in{max-width:340px;padding:0;border-radius:0;background:rgba(0,0,0,.5);border:3px solid #1b1b1b;box-shadow:inset 0 0 0 2px #6b6b6b;-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-ui="block"] .tabpill{display:none}
+:root[data-ui="block"] nav button{border-radius:0;aspect-ratio:1;padding:0;align-content:center;gap:0;color:#fff;font:600 10px var(--f-body);text-shadow:1px 1px 0 #000;border-right:2px solid #6b6b6b}
+:root[data-ui="block"] nav button:last-child{border-right:0}
+:root[data-ui="block"] nav button svg{display:none}
+:root[data-ui="block"] nav button .skin-ic{display:block}
+.skin-ic{display:none;width:30px;height:30px;image-rendering:pixelated;pointer-events:none}
+:root[data-ui="block"] nav button[aria-current="page"]{color:#fff;background:transparent}
+:root[data-ui="block"] nav button[aria-current="page"]::after{content:"";position:absolute;inset:-5px;border:4px solid #fff;box-shadow:0 0 0 2px #000,inset 0 0 0 2px #000;pointer-events:none;z-index:3}
+/* toasts like the advancement pop-up */
+:root[data-ui="block"] .toast,:root[data-ui="block"] .greet{background:#212121!important;border:2px solid #000!important;border-radius:4px!important;box-shadow:inset 2px 2px 0 #555,inset -2px -2px 0 #111!important;color:#fff;font-family:var(--f-body);text-shadow:2px 2px 0 #000}
+:root[data-ui="block"] .greet h3{color:#ffff55}
+:root[data-ui="block"] .greet p,:root[data-ui="block"] .greet-time{color:#fff}
+:root[data-ui="block"] .greet-icon{border-radius:0;background:var(--mc-slot);box-shadow:inset 2px 2px 0 #373737}
+.adv{position:fixed;right:12px;top:calc(var(--hdrH,74px) + 6px);z-index:60;display:flex;gap:10px;align-items:center;min-width:220px;padding:8px 12px 8px 8px;background:#212121;border:2px solid #000;border-radius:4px;box-shadow:inset 2px 2px 0 #555,inset -2px -2px 0 #111;font-family:"Pixelify Sans",ui-monospace,monospace;text-shadow:2px 2px 0 #000;transform:translateX(130%);transition:transform .45s steps(6)}
+.adv.show{transform:none}
+.adv img{width:32px;height:32px;image-rendering:pixelated}
+.adv b{display:block;color:#ffff55;font-size:15px}
+.adv span{color:#fff;font-size:15px}
+
+/* ---------- HEIST: open-world crime game HUD ---------- */
+:root[data-ui="heist"]{
+  --f-body:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-display:"Anton","Impact","Arial Narrow",sans-serif;
+  --f-round:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-mono:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --r:0px; --r-sm:0px;
+  --gta-panel:rgba(0,0,0,.72); --gta-blue:#93c5f5; --gta-cash:#72cc72; --gta-gold:#f0c850; --gta-hp:#5ab55a; --gta-armor:#4c9bd5;
+  --glass:var(--gta-panel); --glass-strong:rgba(0,0,0,.82); --glass-edge:transparent; --glass-hi:transparent;
+  --fill:rgba(255,255,255,.1); --fill-2:rgba(255,255,255,.18); --track:rgba(255,255,255,.16); --sep:rgba(255,255,255,.12);
+  color-scheme:dark;
+}
+:root[data-ui="heist"] body{font-size:18px;letter-spacing:.01em;background:#120a1c!important}
+:root[data-ui="heist"] .ambient{inset:0;animation:none;filter:none;background:var(--skin-sky,linear-gradient(#120a1c,#3a1450))!important}
+:root[data-ui="heist"] .ambient::after{display:none}
+:root[data-ui="heist"] header::before{background:linear-gradient(180deg,rgba(8,5,12,.92) 0 65%,rgba(8,5,12,0))}
+:root[data-ui="heist"] .largetitle{font:400 40px/1 var(--f-display);letter-spacing:.02em;text-transform:uppercase;color:#fff;text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 4px 0 #000}
+:root[data-ui="heist"] .card,:root[data-ui="heist"] .egg-card,:root[data-ui="heist"] .tile,:root[data-ui="heist"] .banner,:root[data-ui="heist"] .wl-card{background:var(--gta-panel)!important;border:0!important;border-radius:0!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+:root[data-ui="heist"] .banner.warn{box-shadow:inset 4px 0 0 var(--gta-gold)!important}
+:root[data-ui="heist"] .banner.bad{box-shadow:inset 4px 0 0 #e0402f!important}
+:root[data-ui="heist"] .label{color:var(--gta-blue);font:600 14px var(--f-body);letter-spacing:.14em}
+:root[data-ui="heist"] .btn,:root[data-ui="heist"] .btn.ghost{font:600 19px var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.72)!important;border:0!important;border-radius:0!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)!important}
+:root[data-ui="heist"] .btn.primary,:root[data-ui="heist"] .btn.primary.pc{background:#fff!important;color:#000!important;box-shadow:inset 0 -4px 0 var(--pc,var(--accent))!important;font:400 24px var(--f-display);letter-spacing:.06em}
+:root[data-ui="heist"] .btn:hover:not(:disabled),:root[data-ui="heist"] .btn:focus-visible{background:#fff!important;color:#000!important;outline:none}
+:root[data-ui="heist"] .btn:disabled{opacity:.4}
+:root[data-ui="heist"] header .navbtn{background:rgba(0,0,0,.75)!important;border:0;border-radius:0;box-shadow:none;font:600 15px var(--f-body);letter-spacing:.04em;text-transform:uppercase;height:38px;padding:0 10px}
+:root[data-ui="heist"] .brand{font:400 18px var(--f-display);letter-spacing:.04em;text-transform:uppercase;text-shadow:2px 2px 0 #000}
+:root[data-ui="heist"] .brand small{font:500 14px var(--f-body);text-transform:none;letter-spacing:.02em}
+:root[data-ui="heist"] #batt i{border-radius:0;border-color:#fff}
+:root[data-ui="heist"] #batt i b{border-radius:0;background:var(--gta-hp)}
+:root[data-ui="heist"] .chips{background:transparent;padding:0;gap:3px;border-radius:0}
+:root[data-ui="heist"] .pchip,:root[data-ui="heist"] .seg button{background:rgba(0,0,0,.72);border-radius:0;color:#fff;text-transform:uppercase}
+:root[data-ui="heist"] .pchip b{font:600 17px var(--f-body);letter-spacing:.04em}
+:root[data-ui="heist"] .pchip span{font:500 15px var(--f-body);color:#ccc}
+:root[data-ui="heist"] .pchip[aria-pressed="true"],:root[data-ui="heist"] .seg button[aria-pressed="true"]{background:#fff;color:#000;box-shadow:none}
+:root[data-ui="heist"] .pchip[aria-pressed="true"] span{color:#333}
+:root[data-ui="heist"] .seg{background:transparent;padding:0;gap:2px;border-radius:0}
+:root[data-ui="heist"] .gd-lens{border-radius:0!important;background:rgba(255,255,255,.18)!important;border-color:#fff!important}
+:root[data-ui="heist"] .meter{height:9px;border-radius:0;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px #000}
+:root[data-ui="heist"] .meter b{border-radius:0;background:var(--gta-cash)}
+:root[data-ui="heist"] .gauge .track{stroke:rgba(255,255,255,.14)}
+:root[data-ui="heist"] .gauge circle{stroke-linecap:butt}
+:root[data-ui="heist"] .gauge-temp{font:400 clamp(64px,19vw,86px)/1 var(--f-display);letter-spacing:.01em;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000,0 5px 0 #000}
+:root[data-ui="heist"] .gauge-temp sup{color:#fff}
+:root[data-ui="heist"] .state-chip{border-radius:0;background:#000!important;color:#fff!important;font:600 15px var(--f-body);letter-spacing:.12em;text-transform:uppercase}
+:root[data-ui="heist"] .state-chip.ready{color:var(--gta-cash)!important}
+:root[data-ui="heist"] .state-chip.heat{color:var(--gta-gold)!important}
+:root[data-ui="heist"] input[type=text],:root[data-ui="heist"] input[type=number],:root[data-ui="heist"] input[type=email],:root[data-ui="heist"] input[type=password],:root[data-ui="heist"] input[type=search],:root[data-ui="heist"] textarea{background:rgba(255,255,255,.08)!important;border:0!important;border-bottom:2px solid #fff!important;border-radius:0!important}
+:root[data-ui="heist"] .switch{border-radius:0}
+:root[data-ui="heist"] .switch::after{border-radius:0}
+:root[data-ui="heist"] .switch:checked{background:var(--gta-cash)}
+:root[data-ui="heist"] input[type=range]::-webkit-slider-runnable-track{border-radius:0;height:8px}
+:root[data-ui="heist"] input[type=range]::-webkit-slider-thumb{border-radius:0;width:14px;height:26px;margin-top:-9px}
+:root[data-ui="heist"] .scheme{border-radius:0;background:rgba(0,0,0,.6)}
+:root[data-ui="heist"] .scheme .bars{border-radius:0}
+/* phone-style dock */
+:root[data-ui="heist"] nav .in{border-radius:22px;background:rgba(8,6,12,.9);border:2px solid #000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 10px 30px rgba(0,0,0,.5);padding:8px 6px}
+:root[data-ui="heist"] .tabpill{border-radius:14px!important;background:rgba(255,255,255,.12)!important}
+:root[data-ui="heist"] nav button{gap:4px;font:600 12px var(--f-body);letter-spacing:.04em;color:#cfc3dc}
+:root[data-ui="heist"] nav button svg{width:22px;height:22px;padding:8px;box-sizing:content-box;border-radius:10px;stroke:#fff;background:var(--app,#555)}
+:root[data-ui="heist"] nav button[aria-current="page"]{color:#fff}
+:root[data-ui="heist"] nav button:nth-of-type(1){--app:#e0602f}
+:root[data-ui="heist"] nav button:nth-of-type(2){--app:#a24bff}
+:root[data-ui="heist"] nav button:nth-of-type(3){--app:#2f8fe0}
+:root[data-ui="heist"] nav button:nth-of-type(4){--app:#3fa34d}
+:root[data-ui="heist"] nav button:nth-of-type(5){--app:#5c5c68}
+:root[data-ui="heist"] .toast{background:rgba(0,0,0,.85)!important;border:0!important;border-radius:0!important;box-shadow:inset 4px 0 0 var(--gta-blue)!important;font:600 17px var(--f-body);letter-spacing:.03em}
+:root[data-ui="heist"] .greet{background:rgba(0,0,0,.85)!important;border:0!important;border-radius:4px!important;box-shadow:none!important}
+:root[data-ui="heist"] .greet-icon{border-radius:4px;background:#3fa34d}
+:root[data-ui="heist"] .greet h3{font:400 20px var(--f-display);letter-spacing:.03em;text-transform:uppercase}
+/* HUD: minimap, wanted stars (streak), cash (dabs) */
+.skin-hud{display:none}
+:root[data-ui="heist"] .skin-hud{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin:-4px 0 -4px}
+.skin-hud .mm{width:84px;height:84px;border-radius:50%;border:3px solid #000;box-shadow:0 0 0 2px rgba(255,255,255,.25);overflow:hidden;position:relative;background:#2d3b30}
+.skin-hud .mm canvas{width:100%;height:100%;display:block}
+.skin-hud .mm i{position:absolute;left:50%;top:50%;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #fff;transform:translate(-50%,-60%);filter:drop-shadow(0 0 2px #000)}
+.skin-hud .st{display:grid;justify-items:end;text-align:right;gap:2px}
+.skin-hud .stars{font-size:22px;line-height:1;letter-spacing:1px;-webkit-text-stroke:1.5px #000}
+.skin-hud .stars span{color:rgba(255,255,255,.2)}
+.skin-hud .stars span.on{color:var(--gta-gold)}
+.skin-hud .cash{font:400 34px/1 var(--f-display);color:var(--gta-cash);text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000}
+.skin-hud .bars{display:grid;grid-template-columns:2fr 1fr;gap:4px;width:min(200px,100%)}
+.skin-hud .bars b{display:block;height:8px;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px #000;position:relative;overflow:hidden}
+.skin-hud .bars b i{position:absolute;inset:0 auto 0 0;background:var(--gta-hp)}
+.skin-hud .bars b + b i{background:var(--gta-armor)}
+.skin-hud small{font:600 13px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:#ddd;text-shadow:1px 1px 0 #000}
+.passed{position:fixed;inset:0;z-index:70;display:grid;place-content:center;justify-items:center;pointer-events:none;opacity:0}
+.passed::before{content:"";position:absolute;left:0;right:0;top:50%;height:150px;transform:translateY(-50%);background:linear-gradient(90deg,transparent,rgba(0,0,0,.78) 18%,rgba(0,0,0,.78) 82%,transparent);z-index:-1}
+.passed h2{margin:0;white-space:nowrap;font:400 clamp(36px,11vw,60px)/1 "Anton","Impact",sans-serif;color:#f0c850;letter-spacing:.02em;text-transform:uppercase;text-shadow:-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,3px 3px 0 #000}
+.passed p{margin:6px 0 0;font:400 24px "Anton","Impact",sans-serif;color:#fff;letter-spacing:.04em;text-transform:uppercase;text-shadow:2px 2px 0 #000}
+.passed.show{animation:passed 3.6s ease forwards}
+@keyframes passed{0%{opacity:0;transform:scale(1.3)}10%{opacity:1;transform:scale(1)}82%{opacity:1}100%{opacity:0}}
+
+/* ---------- easter egg pop-up + secret looks picker ---------- */
+.egg{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.6);opacity:0;transition:opacity .25s}
+.egg.on{opacity:1}
+.egg-card{width:min(100%,340px);text-align:center;display:grid;gap:10px;justify-items:center;padding:24px 20px;border-radius:28px;background:var(--surface);border:1px solid var(--glass-edge);color:var(--fg);transform:scale(.6) rotate(-6deg);transition:transform .5s cubic-bezier(.2,1.5,.35,1)}
+.egg.on .egg-card{transform:none}
+.egg-egg{width:84px;height:100px;animation:eggWob 1.2s ease-in-out infinite}
+@keyframes eggWob{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+.egg-card h2{font-size:24px}
+.egg-card p{margin:0;color:var(--muted);font-size:15px}
+.egg-bits{position:fixed;inset:0;pointer-events:none;z-index:81;overflow:hidden}
+.egg-bits i{position:absolute;top:50%;left:50%;width:10px;height:10px;border-radius:2px;animation:eggBit 1.3s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes eggBit{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+.looks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.look{border:2px solid transparent;background:var(--fill);border-radius:18px;padding:8px;display:grid;gap:6px;text-align:left;min-width:0;color:var(--fg)}
+.look[aria-pressed="true"]{border-color:var(--accent)}
+.look b{font-size:15px;font-weight:700}
+.look small{font-size:12px;color:var(--muted);line-height:1.2}
+.look .pv{height:62px;border-radius:12px;position:relative;overflow:hidden}
+.pv-glass{background:radial-gradient(60% 80% at 20% 20%,#a24bff,transparent),radial-gradient(60% 80% at 90% 90%,#ff6fb1,transparent),#140c1e}
+.pv-glass::after{content:"";position:absolute;inset:14px 18px;border-radius:12px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3)}
+.pv-cockpit{background:#03060f}
+.pv-cockpit::after{content:"";position:absolute;left:50%;top:10px;width:70px;height:70px;transform:translateX(-50%);border-radius:50%;border:4px solid #2a7bff;border-bottom-color:transparent;box-shadow:0 0 12px #2a7bff}
+.pv-block{background:linear-gradient(rgba(0,0,0,.45),rgba(0,0,0,.45)),var(--pv-dirt) 0 0/32px 32px;image-rendering:pixelated}
+.pv-block::after{content:"";position:absolute;left:10px;right:10px;bottom:8px;height:22px;background:#c6c6c6;border:2px solid #000;box-shadow:inset 2px 2px 0 #fff,inset -2px -2px 0 #555}
+.pv-block::before{content:"";position:absolute;left:16px;top:8px;width:60px;height:8px;background:repeating-linear-gradient(90deg,#e2242b 0 8px,transparent 8px 10px);z-index:1}
+.pv-heist{background:radial-gradient(120% 70% at 70% 100%,#ff7a3d,#d6406a 25%,#5a1f6e 55%,#120a1c 85%)}
+.pv-heist::after{content:"$1,284";position:absolute;right:8px;top:6px;font:400 20px "Anton",Impact,sans-serif;color:#72cc72;text-shadow:1px 1px 0 #000,-1px -1px 0 #000}
+.pv-heist::before{content:"";position:absolute;left:8px;bottom:6px;width:38px;height:38px;border-radius:50%;background:#2d3b30;border:2px solid #000}
+.pv-block{--pv-dirt:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAACDklEQVR42k1SwWrbQBB9thXLirRobYyUiApUm4AxpDW0FHwopPQW8Lk/ke/JOZ+Re84+pAZfgrGoQbYc2Vp1pa6lENzDQMgelpmd2bdv573a7c21yEtZKN/l/fPOYr2fh1tmNK9Gvbv7KYDLvgdAFoqZhixUXeQlt3SpqlUs7u6nIi+Z0WSmAQDA988fZaGiJJOq4pbuu1wD8PC4DM7aBMYtncqyUMFZW+QlAIJYxQJAnfp8lxPqPNxOxoPJeBBu0nCTRkkG4GrUmy2iq1FPqqrhsNY2lX9i4XaYLJR+0tjJw3qfb1MJ4NePT6/HY5qreq22kwd22qrd3lwT3Xm49bo2AG7plO6ygr5BU5GqGgaORjMJNykAr2tHScYth2La5+GWEL2uLfKy7nXtt5lEScaM5ioWBDkMHG7pXteejAfUIAvV+HZxvvv77+vgg22dhuu9yA++25ktIt/tPKf5ETVZqNkyHgZOq6nZVksjeFIjOGsz06Bgtoho1u+XyEsNwNsd3+UiLx8el1RmphElGfGZPq2JkkaaU0IGIWA6HAYOtdIKN2mdmcaXi3MAUlVSVQRPtpGFInXJHVGSXfa9xs9RT1Uvh+rVd+xD+cItQ6oKxyMA3+W/F+tTXWOm4Tv2iabJQtW5pb8nzUxjMh5QQEaiF1axII9qq1iQlm+16dM6SjKSmbwNYLaIfJcD+A/ttjPCKQyP+wAAAABJRU5ErkJggg==)}
 </style>
 
 
 <div class="ambient" aria-hidden="true"></div>
 <header>
   <div class="hdr">
-    <span class="navbtn batt" id="batt" title="Battery"><i><b style="width:80%"></b></i><span>80%</span></span>
+    <span class="navbtn batt" id="batt" title="Battery"><i><b style="width:80%"></b></i><span>80%</span><span class="skin-hearts" id="skinHearts" aria-hidden="true"></span></span>
     <button class="devsw" id="devSw" aria-haspopup="true" aria-expanded="false"><span class="brand" id="devName">Emberline<small id="devSub">Peak Pro controller</small></span><svg class="devchev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></button>
     <button class="navbtn pill off" id="connBtn"><span class="dot"></span><span id="connTxt">Connect</span></button>
   </div>
@@ -1301,6 +1525,8 @@ body.lt-open main{padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))!i
   <!-- HOME -->
   <section class="view" id="v-home">
     <h1 class="largetitle">Session</h1>
+    <div class="skin-hud" aria-hidden="true"><div class="mm"><canvas id="skinMap" width="96" height="96"></canvas><i></i></div>
+      <div class="st"><div class="stars" id="skinStars"></div><div class="cash" id="skinCash">$0</div><div class="bars"><b><i id="skinHp"></i></b><b><i id="skinAr"></i></b></div><small>Battery · Chamber</small></div></div>
     <div class="card cc" id="connectCard" hidden></div>
     <div class="banner bad" id="chamberBanner" hidden></div>
     <div class="banner" id="cleanBanner" hidden></div>
@@ -1438,10 +1664,13 @@ body.lt-open main{padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))!i
 
   <!-- SETTINGS -->
   <section class="view" id="v-set" hidden>
-    <h1 class="largetitle">Settings</h1>
+    <h1 class="largetitle" id="setTitle">Settings</h1>
+    <div class="card" id="looksCard" style="display:grid;gap:10px" hidden>
+      <span class="label">Secret looks</span>
+      <div class="looks" id="uiLooks"></div>
+      <p class="muted" id="uiNote" style="margin:0;font-size:13px" hidden>This look uses its own colors, so app themes and accent only change Liquid Glass.</p>
+    </div>
     <div class="card" style="display:grid;gap:10px">
-      <div class="row between"><span>Interface</span><div class="seg" id="uiSeg"><button data-ui="glass">Liquid Glass</button><button data-ui="cockpit">Cockpit</button></div></div>
-      <p class="muted" id="uiNote" style="margin:0;font-size:13px" hidden>Cockpit uses its own dashboard blue and red, so themes and accent apply to Liquid Glass only.</p>
       <span class="label">App theme</span>
       <div class="swatches" id="themeList"></div>
       <div class="row" style="margin-top:4px"><span class="grow">Custom accent</span><span class="colorbtn" id="accSw"><input type="color" id="accColor" aria-label="Accent color"></span><button class="btn small ghost" id="accReset">Reset</button></div>
@@ -2696,6 +2925,7 @@ function logSession(s){
   const d = data();
   let rankBefore = null; try { rankBefore = rankFor(d.sessions); } catch(e){}
   d.sessions.push(s);
+  try { skinCelebrate(s); } catch(e){}
   if (demo){ demo.since++; }
   else { if (d.sessions.length > 5000) d.sessions.splice(0, d.sessions.length - 5000); store.localSince++; save(); }
   if (S.mode === 'demo') S.odo++;
@@ -2914,6 +3144,133 @@ function setStatusBar(){
   set('color-scheme', dark ? 'dark' : 'light');
   set('apple-mobile-web-app-status-bar-style', dark ? 'black-translucent' : 'default');
 }
+/* ===================== SECRET SKINS ===================== */
+const SKIN_VARS = {
+  block: { bg:'#2a1f15', surface:'#c6c6c6', 'surface-2':'#8b8b8b', line:'#555555', fg:'#ffffff', muted:'#d0d0d0', accent:'#a24bff', 'accent-ink':'#ffffff', tint2:'#55ff55', good:'#55ff55', warn:'#ffaa00', bad:'#ff5555', 'glass-edge':'#000000', 'glass-hi':'#ffffff' },
+  heist: { bg:'#120a1c', surface:'#141018', 'surface-2':'#1c1722', line:'#333333', fg:'#ffffff', muted:'#cfc6d8', accent:'#f0c850', 'accent-ink':'#000000', tint2:'#72cc72', good:'#72cc72', warn:'#f0c850', bad:'#e0402f', 'glass-edge':'transparent', 'glass-hi':'transparent' }
+};
+const PX_PAL = { k:'#000', w:'#fff', r:'#e2242b', R:'#8a0c12', o:'#ff8c1a', y:'#ffd84a', l:'#ffe9a8', p:'#a24bff', P:'#5c169e', g:'#55ff55', G:'#2a8a1a', s:'#9a9a9a', S:'#5a5a5a', d:'#3a3a3a', b:'#3fa9ff', B:'#1a5fa8', n:'#8a5a2b', N:'#5a3a1a', t:'#e8b896', h:'#3a2414', e:'#f2efe6' };
+function pxSprite(rows, map){
+  const c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length; const x = c.getContext('2d');
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.'){ x.fillStyle = (map && map[ch]) || PX_PAL[ch]; x.fillRect(i, j, 1, 1); } }));
+  return c.toDataURL();
+}
+const PX = {};
+function pxInit(){
+  if (PX.ok) return; PX.ok = true;
+  PX.heart = pxSprite(['.kk.kk.','krrkrrk','krwrrrk','krrrrRk','.krrRk.','..kRk..','...k...']);
+  PX.half = pxSprite(['.kk.kk.','krrkddk','krwrddk','krrrddk','.krrdk.','..kRk..','...k...']);
+  PX.empty = pxSprite(['.kk.kk.','kddkddk','kdddddk','kdddddk','.kdddk.','..kdk..','...k...']);
+  PX.home = pxSprite(['....k.....','...kok....','...koyk...','..kooyk.k.','..koyyokok','.koyyyyook','.koyylyyok','kooylllyok','koyylllyok','.kooyyyok.','..kkoookk.','....kkk...']);
+  PX.prof = pxSprite(['kkkkkkkkkkkk','knnnnnnnnnnk','knNNNNNNNNnk','kkkkkkkkkkkk','knnnnyynnnnk','knnnnyynnnnk','knnnnnnnnnnk','knNNNNNNNNnk','knnnnnnnnnnk','kkkkkkkkkkkk']);
+  PX.stats = pxSprite(['kkkkkkkkkkk','keeeeeeeeek','keeeeeeegek','keeeeeeegek','keeeebeegek','keeeebeegek','kepeebeegek','kepeebeegek','keeeeeeeeek','kkkkkkkkkkk']);
+  PX.social = pxSprite(['kkkkkkkk','khhhhhhk','khttttkk','kttwtwtk','kttttttk','ktthhttk','kkkkkkkk','.kppppk.','kppppppk','kppppppk']);
+  PX.set = pxSprite(['...kk...','.k.ss.k.','.kssssk.','kssddssk','kssddssk','.kssssk.','.k.ss.k.','...kk...']);
+  PX.adv = pxSprite(['....k.....','...kgk....','...kggk...','..kgggk.k.','..kgllgkgk','.kglllllgk','.kgllwllgk','kgglwwwlgk','kglwwwwlgk','.kgglllgk.','..kkgggkk.','....kkk...']);
+}
+function skinStreak(){
+  const days = new Set((data().sessions || []).map(s => startOfDay(s.t)));
+  let d = startOfDay(Date.now()), n = 0;
+  if (!days.has(d)) d -= DAY;
+  while (days.has(d) && n < 99){ n++; d -= DAY; }
+  return n;
+}
+function skinApply(){
+  const ui = store.ui;
+  if (ui === 'block'){
+    pxInit();
+    document.querySelectorAll('#nav > button').forEach(b => { if (!b.querySelector('.skin-ic')){ const im = new Image(); im.className = 'skin-ic'; im.alt = ''; im.src = PX[b.dataset.v] || PX.home; b.prepend(im); } });
+  }
+  if (ui === 'heist' && !skinApply.sky){
+    skinApply.sky = true;
+    try {
+      const W = 480, H = 900, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+      const g = x.createRadialGradient(W * .7, H, 20, W * .7, H, H * .95);
+      g.addColorStop(0, '#ff7a3d'); g.addColorStop(.22, '#d6406a'); g.addColorStop(.5, '#5a1f6e'); g.addColorStop(.85, '#120a1c'); g.addColorStop(1, '#0b0612');
+      x.fillStyle = g; x.fillRect(0, 0, W, H);
+      let px = 0; const r = mulberry(7);
+      while (px < W){ const w = 22 + r() * 40, h = H * (.12 + r() * .3);
+        x.fillStyle = '#0b0612'; x.fillRect(px, H - h, w, h);
+        if (r() < .3){ x.fillRect(px + w / 2 - 2, H - h - 26, 4, 26); }
+        x.fillStyle = 'rgba(255,200,120,.55)';
+        for (let wy = H - h + 8; wy < H - 6; wy += 10) for (let wx = px + 5; wx < px + w - 5; wx += 8) if (r() < .22) x.fillRect(wx, wy, 3, 5);
+        px += w + 3; }
+      document.documentElement.style.setProperty('--skin-sky', `url(${c.toDataURL('image/jpeg', .8)}) center bottom/cover no-repeat`);
+      const m = $('#skinMap'); if (m){ const y = m.getContext('2d'); y.fillStyle = '#2d3b30'; y.fillRect(0, 0, 96, 96); y.strokeStyle = '#9aa39b'; y.lineWidth = 3;
+        [14, 44, 74].forEach(v => { y.beginPath(); y.moveTo(v, 0); y.lineTo(v + 8, 96); y.stroke(); y.beginPath(); y.moveTo(0, v); y.lineTo(96, v - 6); y.stroke(); });
+        y.fillStyle = '#3f6fae'; y.fillRect(60, 0, 36, 22); y.fillStyle = '#a24bff'; y.beginPath(); y.arc(70, 58, 5, 0, 7); y.fill(); y.strokeStyle = '#000'; y.lineWidth = 1.5; y.stroke(); }
+    } catch(e){}
+  }
+  skinTick();
+}
+function mulberry(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function skinTick(){
+  const ui = store.ui;
+  if (ui === 'block'){
+    pxInit();
+    const el = $('#skinHearts'); if (!el) return;
+    const halves = S.battery == null ? 20 : Math.round(S.battery / 5), k = 'h' + halves;
+    if (el._k !== k){ el._k = k; el.innerHTML = Array.from({ length: 10 }, (_, i) => `<img alt="" src="${halves >= (i + 1) * 2 ? PX.heart : halves === i * 2 + 1 ? PX.half : PX.empty}">`).join(''); }
+  } else if (ui === 'heist'){
+    const st = skinStreak(), n = (data().sessions || []).length;
+    setHTML($('#skinStars'), Array.from({ length: 5 }, (_, i) => `<span class="${i < st ? 'on' : ''}">★</span>`).join(''));
+    setHTML($('#skinCash'), '$' + n.toLocaleString());
+    const hp = $('#skinHp'), ar = $('#skinAr');
+    if (hp) hp.style.width = (S.battery == null ? 100 : S.battery) + '%';
+    if (ar) ar.style.width = Math.max(0, 100 - sinceClean() / (store.cleanEvery || 150) * 100) + '%';
+  }
+}
+function skinCelebrate(s){
+  if (store.ui === 'block'){
+    pxInit();
+    const a = document.createElement('div'); a.className = 'adv';
+    a.innerHTML = `<img alt="" src="${PX.adv}"><div><b>Advancement Made!</b><span>${s && s.hits && s.hits.length ? 'Best hit ' + Math.max(...s.hits).toFixed(1) + 's' : 'Session complete'}</span></div>`;
+    document.body.appendChild(a); requestAnimationFrame(() => requestAnimationFrame(() => a.classList.add('show')));
+    setTimeout(() => { a.classList.remove('show'); setTimeout(() => a.remove(), 600); }, 4200);
+  } else if (store.ui === 'heist'){
+    const p = document.createElement('div'); p.className = 'passed';
+    const best = s && s.hits && s.hits.length ? Math.max(...s.hits) : 0;
+    p.innerHTML = `<h2>Session passed</h2><p>${best ? 'Best hit ' + best.toFixed(1) + 's' : 'Respect +'}</p>`;
+    document.body.appendChild(p); requestAnimationFrame(() => p.classList.add('show'));
+    setTimeout(() => p.remove(), 3800);
+  }
+}
+const LOOKS = [
+  { id:'glass', n:'Liquid Glass', d:'The normal look' },
+  { id:'cockpit', n:'Cockpit', d:'Car dashboard' },
+  { id:'block', n:'Block', d:'Blocky survival game' },
+  { id:'heist', n:'Heist', d:'Open-world crime game' }
+];
+function drawLooks(){
+  const el = $('#uiLooks'); if (!el) return;
+  setHTML(el, LOOKS.map(l => `<button class="look" data-ui="${l.id}" aria-pressed="${(store.ui || 'glass') === l.id}"><span class="pv pv-${l.id}"></span><b>${l.n}</b><small>${l.d}</small></button>`).join(''));
+  [...el.children].forEach(b => b.setAttribute('aria-pressed', b.dataset.ui === (store.ui || 'glass')));
+  $('#looksCard').hidden = !store.eggUi && (store.ui || 'glass') === 'glass';
+  $('#uiNote').hidden = (store.ui || 'glass') === 'glass';
+}
+// easter egg: tap the Settings title 5 times
+const eggTaps = [];
+function eggPop(){
+  if (document.querySelector('.egg')) return;
+  const first = !store.eggUi;
+  store.eggUi = true; save(); drawLooks();
+  const el = document.createElement('div'); el.className = 'egg';
+  el.innerHTML = `<div class="egg-card" role="dialog" aria-label="Easter egg">
+    <svg class="egg-egg" viewBox="0 0 84 100"><defs><linearGradient id="eggG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset=".5" stop-color="#c264ff"/><stop offset="1" stop-color="#5c169e"/></linearGradient></defs><path d="M42 4C20 4 6 44 6 64a36 36 0 0 0 72 0C78 44 64 4 42 4z" fill="url(#eggG)" stroke="#000" stroke-width="3"/><path d="M12 56l12-8 10 8 10-8 10 8 10-8 8 6" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><circle cx="30" cy="78" r="4" fill="#fff"/><circle cx="52" cy="80" r="3" fill="#fff"/><circle cx="44" cy="30" r="3" fill="#fff" opacity=".8"/></svg>
+    <h2>${first ? 'You found a secret!' : 'Secret looks'}</h2>
+    <p>${first ? 'Two hidden looks are now unlocked: Block and Heist. Cockpit lives here now too.' : 'Pick a look below.'}</p>
+    <button class="btn primary" id="eggGo" style="width:100%">Close</button></div>`;
+  document.body.appendChild(el); applyHaptics();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  const bits = document.createElement('div'); bits.className = 'egg-bits';
+  const cols = ['#c264ff', '#ffd84a', '#55ff55', '#3fa9ff', '#ff6f91', '#ffffff'];
+  bits.innerHTML = Array.from({ length: 40 }, (_, i) => { const a = Math.random() * Math.PI * 2, d = 140 + Math.random() * 220;
+    return `<i style="background:${cols[i % cols.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px;--r:${Math.random() * 720 - 360}deg;animation-delay:${Math.random() * .15}s"></i>`; }).join('');
+  document.body.appendChild(bits); setTimeout(() => bits.remove(), 1700);
+  const close = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 260); const c = $('#looksCard'); if (c) c.scrollIntoView({ behavior:'smooth', block:'center' }); };
+  const opened = Date.now(); // ignore leftover taps from spamming the title
+  el.querySelector('#eggGo').addEventListener('click', () => { if (Date.now() - opened > 700) close(); });
+}
 function applyTheme(){
   const root = document.documentElement;
   let t = THEMES.find(x => x.id === store.theme) || THEMES[0];
@@ -2937,7 +3294,12 @@ function applyTheme(){
     Object.entries(COCKPIT).forEach(([k,v]) => root.style.setProperty('--'+k, v));
     root.style.colorScheme = 'dark';
     buildCluster();
+  } else if (SKIN_VARS[store.ui]){
+    root.setAttribute('data-ui', store.ui);
+    Object.entries(SKIN_VARS[store.ui]).forEach(([k,v]) => root.style.setProperty('--'+k, v));
+    root.style.colorScheme = 'dark';
   } else root.removeAttribute('data-ui');
+  try { skinApply(); } catch(e){}
   const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
   document.querySelectorAll('meta[name=theme-color]').forEach(m => { if (bg) m.content = bg; });
   if (bg && bg.startsWith('#') && bg.length >= 7){ const [r,g,b] = hexBytes(bg), dark = (0.299*r+0.587*g+0.114*b)/255 < .5;
@@ -3011,6 +3373,7 @@ function draw(){
   bt.querySelector('b').style.width = (S.battery || 0) + '%';
   bt.querySelector('b').style.background = S.battery < 20 ? 'var(--bad)' : S.battery < 40 ? 'var(--warn)' : 'var(--good)';
   bt.querySelector('span').textContent = S.battery + '%';
+  if (store.ui === 'block' || store.ui === 'heist') skinTick();
   if (bt.classList.contains('chg') !== !!S.charging) bt.classList.toggle('chg', !!S.charging);
   if (!bt.querySelector('.bolt')) bt.querySelector('i').insertAdjacentHTML('beforeend', BOLT);
   if (view === 'home') drawHome();
@@ -3157,8 +3520,7 @@ function drawSettings(){
   $('#accColor').value = /^#[0-9a-f]{6}$/i.test(acc) ? acc : '#ff9d4d'; $('#accSw').style.background = 'var(--accent)';
   document.querySelectorAll('#unitSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.u === store.unit));
   $('#cleanEvery').value = store.cleanEvery;
-  document.querySelectorAll('#uiSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.ui === (store.ui || 'glass')));
-  $('#uiNote').hidden = store.ui !== 'cockpit';
+  drawLooks();
   $('#sinceEdit').value = sinceClean();
   $('#tAll').checked = store.showAll;
   $('#tAuto').checked = store.autoConnect !== false;
@@ -4356,7 +4718,8 @@ $('#warnTest').onclick = () => {
   if (S.mode === 'live') flashHeatCycle(store.warnColor || '#ffffff', 2); else toast('Connect your Peak to test the flash');
 };
 $('#tFull').onchange = async e => { store.fullscreen = e.target.checked; save(); if (e.target.checked) await FS.enter(); else await FS.exit(); setTimeout(drawSettings, 300); };
-$('#uiSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; store.ui = b.dataset.ui; save(); applyTheme(); drawSettings(); requestAnimationFrame(() => moveTabPill(view)); toast(store.ui === 'cockpit' ? 'Cockpit on' : 'Liquid Glass on'); });
+$('#uiLooks').addEventListener('click', e => { const b = e.target.closest('.look'); if (!b) return; store.ui = b.dataset.ui; save(); applyTheme(); drawSettings(); draw(); requestAnimationFrame(() => moveTabPill(view)); toast((LOOKS.find(l => l.id === store.ui) || LOOKS[0]).n + ' on'); });
+$('#setTitle').addEventListener('click', () => { const now = Date.now(); eggTaps.push(now); while (eggTaps.length && now - eggTaps[0] > 2500) eggTaps.shift(); if (eggTaps.length >= 5){ eggTaps.length = 0; eggPop(); } });
 $('#ckSeg').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) selectProfile(+b.dataset.p); });
 function askClear(){
   const w = $('#clearWrap');
@@ -5218,13 +5581,13 @@ async function apiFetch(path, opts = {}){
   let res;
   opts = Object.assign({}, opts, { headers: Object.assign({ 'x-app-type':'puffco-app', 'x-app-platform':'Web', 'x-app-version':'3.13.31' }, opts.headers || {}) });
   try { res = await fetch(PUFFCO_API + path, Object.assign({ mode:'cors', credentials:'omit' }, opts)); }
-  catch(e){ throw new AcctError('blocked', 'This browser couldn’t reach Puffco’s servers. They may only accept requests from Puffco’s own app. Use Import from file instead.'); }
+  catch(e){ throw new AcctError('blocked', 'This browser couldn’t reach Puffco’s servers. They may only accept requests from Puffco’s own app.'); }
   if (res.status === 401 || res.status === 403) throw new AcctError('auth', 'Puffco rejected the sign-in.');
   if (!res.ok){
     // show what Puffco actually said (same messages as their app)
     let body = ''; try { body = await res.text(); } catch(e){}
     let code = ''; try { const j = JSON.parse(body); const e0 = (j.errors || [])[0] || {}; code = String(e0.code || e0.message || j.message || j.error || j.code || '').trim(); if (Array.isArray(j.message)) code = j.message.join(', '); } catch(e){ code = body.slice(0, 120); }
-    const MSG = { INVALID_CREDENTIALS:'That email or password doesn’t match a Puffco account. If you made your account with Google or Apple, it has no password, so set one in the Puffco app first (Account → Change password) or use Import from file.',
+    const MSG = { INVALID_CREDENTIALS:'That email or password doesn’t match a Puffco account. If you made your account with Google or Apple, it has no password, so set one in the Puffco app first (Account → Change password).',
       EMAIL_NOT_VERIFIED:'Puffco says this email isn’t verified yet. Check your inbox for their email, then try again.',
       INVALID_EMAIL:'Puffco says that isn’t a valid email address.', CLIENT_VERSION_NOT_SUPPORTED:'Puffco updated their app and now rejects this version. Tell Claude so it can update Emberline.', INVALID_SESSION:'Please sign in again.', FORBIDDEN_RESOURCE:'Puffco blocked that request.' };
     const key = Object.keys(MSG).find(k => code.toUpperCase().includes(k));
@@ -5248,7 +5611,7 @@ async function puffcoSignIn(email, password){
   let t;
   email = String(email || '').trim().toLowerCase();
   try { t = await apiFetch('/api/users/login', { method:'POST', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body: JSON.stringify({ email, password }) }); }
-  catch(e){ if (e.kind === 'auth') throw new AcctError('auth', 'Wrong email or password. If you sign in to Puffco with Apple or Google, use Import from file instead.'); throw e; }
+  catch(e){ if (e.kind === 'auth') throw new AcctError('auth', 'Wrong email or password. If you sign in to Puffco with Apple or Google, set a password in the Puffco app first (Account → Change password).'); throw e; }
   if (!t || !t.accessToken) throw new AcctError('http', 'Puffco didn’t return a sign-in token.');
   store.account = Object.assign(store.account || {}, { auth: { accessToken: t.accessToken, refreshToken: t.refreshToken }, email }); save();
   await puffcoSync();
@@ -5317,7 +5680,7 @@ function acctFormHtml(prefix){
       <label class="mefield">Password<input type="password" id="${prefix}Pass" autocomplete="current-password" required></label>
       <p class="muted acct-err" id="${prefix}Err" hidden></p>
       <div class="shop-actions"><button class="btn primary" type="submit" id="${prefix}Go">Sign in</button>
-      <label class="btn small" for="${prefix}File">Import from file<input type="file" id="${prefix}File" accept=".har,application/json" hidden></label></div>
+      <label class="btn small" for="${prefix}File" hidden>Import from file<input type="file" id="${prefix}File" accept=".har,application/json" hidden></label></div>
       <p class="muted" style="margin:0;font-size:12px">Your password goes only to Puffco&#8217;s server (api.puffco.app). Emberline keeps the sign-in token on this phone so it can sync again later.</p>
     </form>`;
 }
@@ -5325,7 +5688,7 @@ function drawAccount(){
   const el = $('#acctCard'); if (!el) return;
   const a = acct();
   el.innerHTML = `<span class="label">Puffco account</span>` + (a && a.data
-    ? `${acctSummary()}<div class="shop-actions">${a.auth ? '<button class="btn small primary" id="acSync">Sync now</button>' : ''}<label class="btn small" for="acFile2">Import from file<input type="file" id="acFile2" accept=".har,application/json" hidden></label><button class="btn small ghost" id="acOut" style="color:var(--bad)">Sign out</button></div>`
+    ? `${acctSummary()}<div class="shop-actions">${a.auth ? '<button class="btn small primary" id="acSync">Sync now</button>' : ''}<label class="btn small" for="acFile2" hidden>Import from file<input type="file" id="acFile2" accept=".har,application/json" hidden></label><button class="btn small ghost" id="acOut" style="color:var(--bad)">Sign out</button></div>`
     : `<p class="muted" style="margin:0;font-size:14px">Link your Puffco account to bring in your saved moods, heat profiles and dab stats.</p>${acctFormHtml('ac')}`);
 }
 async function runAcct(prefix, fn){
