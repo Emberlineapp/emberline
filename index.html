@@ -5471,6 +5471,26 @@ const INTRO_ZONES = { motion:'still', tempoFrac:.5, zones:[
 const INTRO_PROXY = { motion:'still', tempoFrac:.5, zones: Array.from({ length: 6 }, () => ({ c:'#ffffff', c2:'#b4148c', fx:'fade', sp:.25, bias:.25 })) }; // Proxy ring: pinkish purple, with a white sweep going around
 let introDone = false;
 let introBrightUntil = 0; // Proxy intro holds full brightness until then
+// Proxy startup: one animated light (pink-purple ring with a white sweep spinning around) that the Proxy plays on its own,
+// faded in and out with brightness. Smooth because nothing is streamed frame by frame.
+async function proxyIntro(){
+  const lbrt = v => { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, Math.round(v), true); return ble.write('/u/app/ui/lbrt', b).catch(() => {}); };
+  let lamp; try { lamp = moodLamp({ kind:'tpl', tag:'pikaled2-spin-mood-light', name:'Intro', meta:{ userColors:['#b4148c', '#ffffff'], tempoFrac:.42, dynamicInhale:0 } }); } catch(e){ return; }
+  const blob = lampBlob(lamp);
+  introBrightUntil = Date.now() + 5400;
+  const steps = 8, ease = t => t * t * (3 - 2 * t);
+  ledJob(async () => {
+    await lbrt(0);
+    try { await previewWrite(blob); } catch(e){ return; }
+    for (let i = 1; i <= steps; i++){ await lbrt(256 * ease(i / steps)); await sleep(60); } // glide on
+  });
+  setTimeout(() => ledJob(async () => {
+    if (S.mode !== 'live' || !isProxy() || (S.state >= 7 && S.state <= 9)) return;
+    for (let i = steps - 1; i >= 0; i--){ await lbrt(256 * ease(i / steps)); await sleep(70); } // glide off
+    await previewClear();
+    const b = brightFor(S.active) || store.bright; if (b) await writeBright(b).catch(() => {}); else await lbrt(256);
+  }), 4300);
+}
 function connectIntro(){
   if (introDone || S.mode !== 'live' || S.api === 2 ||
       (S.state >= 7 && S.state <= 9) || zoneLive.on) return;
@@ -5478,6 +5498,7 @@ function connectIntro(){
   const meta = JSON.parse(JSON.stringify(isProxy() ? INTRO_PROXY : INTRO_ZONES));
   meta.env = { in: 500, out: 4300, outMs: 650 }; // 5 seconds: glide on fast, glide off at the end
   zPh.length = 0; zClock.last = 0; if (isProxy()) meta.zones.forEach((z, i) => { zPh[i] = .5 + i / 12; }); else zPh[3] = .5; // start on purple
+  if (isProxy()){ proxyIntro(); return; } // Proxy: let the device animate it itself, much smoother than streaming frames over Bluetooth
   if (!zoneLiveStart(meta, true)) return;
   // Proxy: play the intro at full brightness, then put the user's brightness back
   if (isProxy()){ introBrightUntil = Date.now() + 5150; const full = new Uint8Array(4); new DataView(full.buffer).setInt32(0, 256, true); ble.write('/u/app/ui/lbrt', full).catch(() => {});
