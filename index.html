@@ -3212,6 +3212,7 @@ async function writeBright(b){
 }
 async function applyProfileBright(i){
   const b = brightFor(i); if (!b || S.mode !== 'live') return;
+  if (Date.now() < introBrightUntil) return; // the intro puts it back when it ends
   if (Array.isArray(store.bright) && b.join() === store.bright.join()) return; // already showing
   try { await writeBright(b); save(); } catch(e){}
 }
@@ -5449,6 +5450,7 @@ const INTRO_ZONES = { motion:'still', tempoFrac:.5, zones:[
   { c:'#000000', fx:'off' } ] };                        // glass left: off  (only the logo lights up)
 const INTRO_PROXY = { motion:'still', tempoFrac:.5, zones: Array.from({ length: 6 }, () => ({ c:'#ffffff', c2:'#64007d', fx:'fade', sp:.25, bias:.25 })) }; // Proxy ring: purple, with a white sweep going around
 let introDone = false;
+let introBrightUntil = 0; // Proxy intro holds full brightness until then
 function connectIntro(){
   if (introDone || S.mode !== 'live' || S.api === 2 ||
       (S.state >= 7 && S.state <= 9) || zoneLive.on) return;
@@ -5457,6 +5459,9 @@ function connectIntro(){
   meta.env = { in: 500, out: 4300, outMs: 650 }; // 5 seconds: glide on fast, glide off at the end
   zPh.length = 0; zClock.last = 0; if (isProxy()) meta.zones.forEach((z, i) => { zPh[i] = .5 + i / 12; }); else zPh[3] = .5; // start on purple
   if (!zoneLiveStart(meta, true)) return;
+  // Proxy: play the intro at full brightness, then put the user's brightness back
+  if (isProxy()){ introBrightUntil = Date.now() + 5150; const full = new Uint8Array(4); new DataView(full.buffer).setInt32(0, 256, true); ble.write('/u/app/ui/lbrt', full).catch(() => {});
+    setTimeout(() => { if (S.mode !== 'live' || !isProxy()) return; const b = brightFor(S.active) || store.bright; if (b) writeBright(b).catch(() => {}); }, 5150); }
   setTimeout(() => { if (zoneLive.on && zoneLive.meta === meta) zoneLiveStop(true); }, 5050); // leave it alone if the zone editor took over
 }
 
