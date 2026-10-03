@@ -5448,7 +5448,7 @@ const INTRO_ZONES = { motion:'still', tempoFrac:.5, zones:[
   { c:'#ffffff', c2:'#64007d', fx:'fade',  sp:.25, bias:.25 },    // logo bottom: mostly purple, a quick flash of white
   { c:'#000000', fx:'off' },                            // base right: off
   { c:'#000000', fx:'off' } ] };                        // glass left: off  (only the logo lights up)
-const INTRO_PROXY = { motion:'still', tempoFrac:.5, zones: Array.from({ length: 6 }, () => ({ c:'#ffffff', c2:'#64007d', fx:'fade', sp:.25, bias:.25 })) }; // Proxy ring: purple, with a white sweep going around
+const INTRO_PROXY = { motion:'still', tempoFrac:.5, zones: Array.from({ length: 6 }, () => ({ c:'#ffffff', c2:'#b4148c', fx:'fade', sp:.25, bias:.25 })) }; // Proxy ring: pinkish purple, with a white sweep going around
 let introDone = false;
 let introBrightUntil = 0; // Proxy intro holds full brightness until then
 function connectIntro(){
