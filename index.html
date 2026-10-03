@@ -1601,10 +1601,10 @@ body.lt-open main{padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))!i
 
   <!-- PROFILES -->
   <section class="view" id="v-prof" hidden>
-    <h1 class="largetitle">Profiles</h1><div class="subhead">Changes save straight to your Peak</div>
+    <h1 class="largetitle">Profiles</h1><div class="subhead" id="profSub">Changes save straight to your Peak</div>
     <div id="profList" class="view"></div>
     <div class="card" style="display:grid;gap:6px">
-      <span class="label">Peak lights</span>
+      <span class="label" id="lightsLbl">Peak lights</span>
       <label class="toggle"><span><b>Lantern</b><br><span class="muted" style="font-size:13px">Ambient glow while idle</span></span><input type="checkbox" class="switch" id="tLantern"></label>
       <div class="row" style="margin:4px 0 8px"><span class="grow muted" style="font-size:13px">Lantern color</span><span class="colorbtn" id="lanternSw" style="background:#ff9d4d"><input type="color" id="lanternColor" value="#ff9d4d" aria-label="Lantern color"></span></div>
       <div class="row" style="margin:0 0 8px;gap:8px"><span class="grow muted" style="font-size:13px">Lantern mood<br><b id="lanternMoodName" style="color:var(--fg);font-weight:600">None, using the color</b></span><button class="btn small" id="bLanternMood">Pick from Lights</button></div>
@@ -2161,8 +2161,9 @@ class Lorax {
   intScale(path){
     // Proxy units (from the device inspector): temps in tenths of °C, times in hundredths of a second,
     // battery in hundredths of a percent, volts in millivolts
+    if (/intn|lbrt/.test(path)) return 256;                       // vapor setting, brightness
     if (/temp|btmp|tcmd/.test(path)) return 10;
-    if (/elap|tott|time|btim/.test(path)) return 100;
+    if (/elap|tott|time|btim|mbct/.test(path)) return 200;         // Puffco web app: times are seconds x 200
     if (/bat\/soc/.test(path)) return 100;
     if (/volt/.test(path)) return 1000;
     if (/led\/di[fa]/.test(path)) return 4096; // Puffco web app: 4096 = 1.0
@@ -2171,7 +2172,7 @@ class Lorax {
   async u8(path){ return (await this.read(path, 1))[0]; }
   async u32(path){ const r = await this.read(path, 4); return new DataView(r.buffer).getUint32(0, true); }
   async str(path){ const r = await this.read(path, 64); return dec.decode(r).split('\0')[0].trim(); }
-  wf32(path, v){ const b = new Uint8Array(4), t = this.ints[path]; if (t) new DataView(b.buffer).setInt32(0, Math.round(v * t.scale), true); else new DataView(b.buffer).setFloat32(0, v, true); return this.write(path, b); }
+  wf32(path, v){ const b = new Uint8Array(4), t = this.ints[path] || (isProxy() ? { scale: this.intScale(path) } : null); /* Proxy stores whole numbers everywhere, even when the value reads 0 */ if (t) new DataView(b.buffer).setInt32(0, Math.round(v * t.scale), true); else new DataView(b.buffer).setFloat32(0, v, true); return this.write(path, b); }
   async readAll(path){
     const out = []; let off = 0;
     while (off < 4096){
@@ -2961,7 +2962,7 @@ async function bootConnection(){
 let wakeLock = null;
 async function holdWake(){ if (wakeLock || !navigator.wakeLock) return; try { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } catch(e){} }
 function releaseWake(){ try { wakeLock && wakeLock.release(); } catch(e){} wakeLock = null; }
-function needLive(what){ if (S.mode === 'live') return true; toast(`Connect your Peak to ${what}`); if (view !== 'home') show('home'); return false; }
+function needLive(what){ if (S.mode === 'live') return true; toast(`Connect your ${devWord()} to ${what}`); if (view !== 'home') show('home'); return false; }
 
 async function detectLedApi(){
   try {
@@ -3138,7 +3139,7 @@ async function selectProfile(i){
 }
 async function saveProfile(i){
   const p = S.profiles[i];
-  if (S.mode !== 'live'){ toast('Connect your Peak to save. Your edits are kept here for now.'); render(); return; }
+  if (S.mode !== 'live'){ toast(`Connect your ${devWord()} to save. Your edits are kept here for now.`); render(); return; }
   try {
     await ble.write(`/u/app/hc/${i}/name`, new Uint8Array([...enc.encode(p.name).slice(0,20), 0]));
     await ble.wf32(`/u/app/hc/${i}/temp`, p.tempC);
@@ -3153,7 +3154,7 @@ async function saveProfile(i){
     }
     if (S.active === i) await ble.write('/p/app/hcs', new Uint8Array([i]));
     store.profSaved = store.profSaved || []; store.profSaved[i] = true; save();
-    toast(`Saved "${p.name}" to your Peak`);
+    toast(`Saved "${p.name}" to your ${devWord()}`);
   } catch(e){ toast('Save failed: ' + e.message); }
 }
 // Proxy: write a light file and read it back, trying each write style until the Proxy keeps it
@@ -3639,7 +3640,8 @@ function ago(t){ const d = Math.floor((Date.now()-t)/DAY); return d <= 0 ? 'toda
 
 function drawProfiles(){ drawProfilesInner(); applyHaptics(); }
 function drawProfilesInner(){
-  $('#profList').innerHTML = (S.mode === 'live' ? '' : '<div class="banner"><div class="grow"><b>Not connected</b>These are placeholder profiles. Connect to load and edit the ones on your Peak.</div></div>') + S.profiles.map((p,i) => `
+  { const a = $('#profSub'), b = $('#lightsLbl'); if (a) a.textContent = `Changes save straight to your ${devWord()}`; if (b) b.textContent = `${devWord()} lights`; }
+  $('#profList').innerHTML = (S.mode === 'live' ? '' : '<div class="banner"><div class="grow"><b>Not connected</b>These are placeholder profiles. Connect to load and edit the ones on your ' + devWord() + '.</div></div>') + S.profiles.map((p,i) => `
     <div class="card pcard">
       <div class="pcard-head">
         <button class="pdot" data-golights="${i}" style="${p.mood ? swatchStyle(p.mood) : 'background:' + p.color}" aria-label="Change ${esc(p.name)} lights"><span class="pdot-pen" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></span></button>
@@ -3651,8 +3653,8 @@ function drawProfilesInner(){
         <input type="range" id="pt${i}" data-i="${i}" min="400" max="644" step="1" value="${Math.round(c2f(p.tempC))}"></div>
       <div class="field"><div class="row between"><span class="muted">Duration</span><span class="val" id="pdv${i}">${p.time}s</span></div>
         <input type="range" id="pd${i}" data-i="${i}" min="15" max="120" step="5" value="${p.time}"></div>
-      <div class="field"><div class="row between"><span class="muted">Vapor</span>${is3DXL() ? '<span class="xl-tag on">3DXL</span>' : '<span class="xl-tag">Extreme needs 3DXL</span>'}</div>
-        <div class="seg vap" data-vi="${i}">${VAPOR.map(o => `<button data-vap="${o.v}" aria-pressed="${Math.abs(p.vapor - o.v) < .01}" ${o.xl && !is3DXL() ? 'disabled' : ''}>${o.n}</button>`).join('')}</div></div>
+      <div class="field"><div class="row between"><span class="muted">Vapor</span>${isProxy() ? '' : is3DXL() ? '<span class="xl-tag on">3DXL</span>' : '<span class="xl-tag">Extreme needs 3DXL</span>'}</div>
+        <div class="seg vap" data-vi="${i}">${VAPOR.filter(o => !(o.xl && isProxy())).map(o => `<button data-vap="${o.v}" aria-pressed="${Math.abs(p.vapor - o.v) < .01}" ${o.xl && !is3DXL() ? 'disabled' : ''}>${o.n}</button>`).join('')}</div></div>
       <div class="boostbox">
         <div class="row between"><span class="bb-title">Boost</span><span class="muted" style="font-size:13px" id="pbsum${i}">${fmtDelta(p.boostF)} · +${p.boostT}s per tap</span></div>
         <div class="field"><div class="row between"><span class="muted">Adds temperature</span><span class="val" id="pbfv${i}">${fmtDelta(p.boostF)}</span></div>
@@ -3660,7 +3662,7 @@ function drawProfilesInner(){
         <div class="field"><div class="row between"><span class="muted">Adds time</span><span class="val" id="pbtv${i}">+${p.boostT}s</span></div>
           <input type="range" id="pbt${i}" data-i="${i}" min="0" max="60" step="5" value="${p.boostT}"></div>
       </div>
-      <div class="row between"><span class="muted" style="font-size:13px">${i===S.active ? 'Active profile' : ''}</span><button class="btn small primary" data-save="${i}">Save to Peak</button></div>
+      <div class="row between"><span class="muted" style="font-size:13px">${i===S.active ? 'Active profile' : ''}</span><button class="btn small primary" data-save="${i}">Save to ${devWord()}</button></div>
     </div>`).join('');
 }
 
@@ -5513,7 +5515,7 @@ async function writeMoodTo(target, ref){
   }
   const i = target, p = S.profiles[i];
   p.mood = ref; { const mc = moodColors(ref).filter((c, k, a) => a.indexOf(c) === k); p.color = pickAccent(mc) || p.color; p.pal = mc.filter(c => Math.max(...hexBytes(c)) > 40).slice(0, 6); }
-  if (S.mode !== 'live'){ p.lightDirty = true; toast(`${name} saved on ${p.name}. It goes to your Peak when you connect and save.`); render(); return; }
+  if (S.mode !== 'live'){ p.lightDirty = true; toast(`${name} saved on ${p.name}. It goes to your ${devWord()} when you connect and save.`); render(); return; }
   if (S.api === 2){ await writeProfileColor(i, p.color); toast('This firmware only supports solid colors, so the first color was used'); return; }
   const blob = moodPayload(ref);
   await ble.writeBlob(`/u/app/hc/${i}/colr`, blob);
@@ -5539,6 +5541,60 @@ function moodTile(ref, idx, group){
   return `<button class="mood" data-mg="${group}" data-mi="${idx}" aria-pressed="${!!on}"><i class="mood-sw" style="${swatchStyle(ref)}"></i>${group === 'm' ? '<span class="medit">Edit</span>' : ''}<b>${esc(ref.name)}</b><span>${esc(tplName)}</span></button>`;
 }
 function sameMood(a, b){ return a && b && a.kind === b.kind && (a.kind === 'excl' ? a.id === b.id : (a.id && a.id === b.id) || (a.tag === b.tag && JSON.stringify(a.meta) === JSON.stringify(b.meta))); }
+/* ---- randomizer: random but good-looking color combos and effects ---- */
+const RND = { cur: null, hist: [] };
+const RND_FX = [ // effect, colors min..max, tempo range, extra
+  { tag:'pikaled2-fade-mood-light', n:[2,4], t:[.3,.65], w:3 },
+  { tag:'pikaled2-spin-mood-light', n:[2,4], t:[.3,.6], w:3 },
+  { tag:'pikaled2-split-gradient-mood-light', n:[2,3], t:[.25,.55], w:2 },
+  { tag:'pikaled2-vertical-slideshow-mood-light', n:[2,4], t:[.3,.55], w:2 },
+  { tag:'pikaled2-disco-mood-light', n:[3,5], t:[.4,.7], w:1, bold:true },
+  { tag:'migration-confetti-mood-light', n:[3,5], t:[.3,.55], d:[4,8], w:2, bold:true },
+  { tag:'migration-lava-lamp-mood-light', n:[3,3], t:[.2,.45], d:[1,4], w:2, lava:true },
+  { tag:'emberline-fx-breathe', n:[1,2], t:[.3,.55], w:1 },
+  { tag:'emberline-fx-wave', n:[2,3], t:[.35,.6], w:1 },
+  { tag:'emberline-fx-comet', n:[1,2], t:[.35,.6], w:1 }
+];
+const RND_WORDS = [['Neon','Velvet','Cosmic','Electric','Midnight','Solar','Frozen','Candy','Molten','Lunar','Toxic','Crystal','Golden','Ghost','Ultra','Hyper','Dream','Wild'],
+  ['Drift','Bloom','Pulse','Haze','Storm','Wave','Glow','Rush','Tide','Flare','Mist','Orbit','Ember','Prism','Static','Fizz','Nova','Daze']];
+const rr = (a, b) => a + Math.random() * (b - a), ri = (a, b) => Math.floor(rr(a, b + 1)), pick = a => a[Math.floor(Math.random() * a.length)];
+function hsl(h, sat, l){ h = ((h % 360) + 360) % 360; sat /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = sat * Math.min(l, 1 - l), f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join(''); }
+// LED-friendly color: strong saturation, and yellows/greens a bit brighter so they don't go muddy
+const ledColor = (h, l) => { h = ((h % 360) + 360) % 360; const lift = h > 35 && h < 160 ? 6 : 0; return hsl(h, rr(85, 100), Math.min(62, (l ?? rr(48, 56)) + lift)); };
+function rndPalette(n, lava, bold){
+  const base = Math.random() * 360;
+  if (lava){ // dark base, bright blobs, like Puffco's lava lamps. Deep yellows/oranges turn brown, so those get a deep red base instead
+    const h = base, dh = (h > 25 && h < 100) ? 345 : h; return [hsl(dh, 100, rr(12, 17)), ledColor(h + rr(10, 25)), ledColor(h + rr(35, 55), 60)]; }
+  const scheme = bold ? pick(['triad', 'split', 'comp', 'rainbow']) : pick(['analog', 'analog', 'comp', 'triad', 'split', 'mono', 'rainbow']);
+  let hues;
+  if (scheme === 'rainbow'){ const step = rr(300, 360) / n; hues = Array.from({ length: n }, (_, i) => base + i * step); }
+  else hues = ({ analog: [0, 42, 84, -42, 126, -84], comp: [0, 180, 30, 210, -30, 150], triad: [0, 120, 240, 40, 160, 280], split: [0, 150, 210, 40, 190, 320], mono: [0, 0, 0, 0, 0, 0] })[scheme].slice(0, n).map(o => base + o + (scheme === 'mono' ? 0 : rr(-6, 6)));
+  const out = scheme === 'mono' ? hues.map((h, i) => ledColor(h + i * 10, [54, 34, 64, 44, 60, 40][i])) : hues.map(h => ledColor(h));
+  if (n >= 3 && Math.random() < .15) out[ri(1, n - 1)] = '#ffffff'; // now and then a white accent
+  return out;
+}
+function rndMood(){
+  const pool = RND_FX.filter(f => MOODS.tpl[f.tag]), bag = []; pool.forEach(f => { for (let i = 0; i < f.w; i++) bag.push(f); });
+  let f = pick(bag); if (RND.cur && bag.length > 1 && f.tag === RND.cur.tag && Math.random() < .7) f = pick(bag); // mix it up
+  const n = ri(f.n[0], f.n[1]), meta = { userColors: rndPalette(n, f.lava, f.bold), tempoFrac: Math.round(rr(f.t[0], f.t[1]) * 100) / 100, dynamicInhale: 0 };
+  if (f.d) meta.density = ri(f.d[0], f.d[1]);
+  return { kind:'tpl', tag: f.tag, name: pick(RND_WORDS[0]) + ' ' + pick(RND_WORDS[1]), meta };
+}
+function rndCard(){
+  const r = RND.cur, t = r ? (MOODS.tpl[r.tag] || {}).name || '' : '';
+  return `<div class="sgroup" id="rndCard"><div class="row between"><span class="label">Randomizer</span><span class="muted" style="font-size:12px">Random colors + effect</span></div>
+    ${r ? `<div class="mood" style="pointer-events:none;width:100%;max-width:none"><i class="mood-sw" style="${swatchStyle(r)}"></i><b>${esc(r.name)}</b><span>${esc(t)}${r.meta.userColors.length ? ' · ' + r.meta.userColors.length + ' colors' : ''}</span></div>` : '<p class="muted" style="margin:0">Tap Shuffle for a random color combo and effect.</p>'}
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" id="rndGo" style="flex:1">${r ? 'Shuffle again' : 'Shuffle'}</button>${RND.hist.length > 1 ? '<button class="btn" id="rndBack">Back</button>' : ''}</div>
+    ${r ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="rndSet" style="flex:1">Set on ${esc(((moodTarget ?? S.active) === 'lantern' ? 'lantern' : (S.profiles[moodTarget ?? S.active] || {}).name || 'profile').slice(0, 10))}</button><button class="btn" id="rndSave" style="flex:1">Save mood</button></div>` : ''}</div>`;
+}
+function rndWire(){
+  const go = $('#rndGo'); if (!go) return;
+  go.onclick = () => { RND.cur = rndMood(); RND.hist.push(RND.cur); if (RND.hist.length > 20) RND.hist.shift(); drawMoods(); previewMood(RND.cur, 6000); };
+  const bk = $('#rndBack'); if (bk) bk.onclick = () => { RND.hist.pop(); RND.cur = RND.hist[RND.hist.length - 1] || null; drawMoods(); if (RND.cur) previewMood(RND.cur, 6000); };
+  const st = $('#rndSet'); if (st) st.onclick = async () => { try { await writeMoodTo(moodTarget ?? S.active, RND.cur); } catch(e){ toast('Could not set it: ' + (e.message || e)); } drawMoods(); };
+  const sv = $('#rndSave'); if (sv) sv.onclick = () => { const m = { id: 'local-' + Date.now(), name: RND.cur.name, tag: RND.cur.tag, meta: JSON.parse(JSON.stringify(RND.cur.meta)) }; store.myMoods.unshift(m); save(); toast(`Saved "${m.name}" to your moods`); drawMoods(); };
+}
 function drawMoods(){
   { const el = $('#moodFor'); if (el){ const t = moodTarget ?? S.active, n = t === 'lantern' ? 'the lantern' : ((S.profiles[t] || {}).name || 'P' + (t + 1)); el.textContent = `Tap a mood to set it on ${n}`; } }
   const box = $('#moodLib'); if (!box) return;
@@ -5546,10 +5602,11 @@ function drawMoods(){
   $('#moodTarget').innerHTML = S.profiles.map((p, i) => `<button data-mt="${i}" aria-pressed="${tgt === i}">${esc(p.name.slice(0, 7))}</button>`).join('') + `<button data-mt="lantern" aria-pressed="${tgt === 'lantern'}">Lantern</button>`;
   const excl = MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }));
   const mine = allMine().map(m => Object.assign({ kind:'tpl' }, m));
-  box.innerHTML =
+  box.innerHTML = rndCard() +
     `<div class="sgroup"><div class="label">Puffco exclusives</div><div class="moods">${excl.map((r, i) => moodTile(r, i, 'x')).join('')}</div></div>` +
     `<div class="sgroup"><div class="row between"><span class="label">Your moods</span><span class="row" style="gap:6px"><button class="btn small" id="bNewMood">New mood</button></span></div><div class="moods">${mine.map((r, i) => moodTile(r, i, 'm')).join('') || '<p class="muted">No saved moods yet.</p>'}</div></div>`;
   $('#bNewMood').onclick = () => openMoodEditor();
+  rndWire();
 }
 function moodFromTile(g, i){
   if (g === 'x'){ const x = MOODS.excl.filter(x => !isProxy() || x.toad)[i]; return { kind:'excl', id:x.id, name:x.name }; }
@@ -5740,7 +5797,7 @@ function loadAccountProfile(i, slot){
     if (p.mood) p.color = moodColors(p.mood)[0] || p.color;
   }
   drawProfiles(); syncRanges();
-  toast(`Loaded "${a.name}" into P${slot + 1}. Tap Save to Peak to keep it.`);
+  toast(`Loaded "${a.name}" into P${slot + 1}. Tap Save to ${devWord()} to keep it.`);
 }
 
 /* ---- device settings ---- */
