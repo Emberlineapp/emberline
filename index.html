@@ -3043,7 +3043,7 @@ function trackSession(prev, st){
   if (prev === 8 && st !== 8 && S.mode === 'live' && !zoneLive.on){ clearTimeout(previewTimer); setTimeout(() => { ledJob(previewClear); if (LT.on) ltShowCurrent(); }, 900); }
   const tF = c2f(S.tempC);
   if (st === 7 && prev !== 7 && !cur){
-    cur = { t:Date.now(), p:S.active, name:S.profiles[S.active].name, target:Math.round(c2f(S.profiles[S.active].tempC)), peak:tF, hit:false, batt:S.battery };
+    cur = { t:Date.now(), p:S.active, name:S.profiles[S.active].name, target:Math.round(c2f(S.profiles[S.active].tempC)), peak:tF, hit:false, batt:S.battery, startF:Math.round(tF) };
   }
   if (cur){
     cur.peak = Math.max(cur.peak, tF);
@@ -3052,7 +3052,11 @@ function trackSession(prev, st){
       const ranFor = cur.readyAt ? (Date.now() - cur.readyAt) / 1000 : 0;
       S.cyclesSinceOdo = (S.cyclesSinceOdo || 0) + 1;
       const gotHit = (cur.hits || HIT.hits || []).some(h => h >= 1);
-      if (cur.hit && (ranFor >= 20 || gotHit)){ logSession({ t:cur.t, p:cur.p, name:cur.name, target:cur.target, peak:Math.round(cur.peak), dur:Math.round((Date.now()-cur.t)/1000), batt:cur.batt, hits:(cur.hits || HIT.hits).slice(0, 20), vapor:(S.profiles[cur.p] || {}).vapor, sc:sinceClean() + 1, run: cur.readyAt ? Math.round((Date.now() - cur.readyAt) / 1000) : null }); }
+      // ranked cool-down: the chamber has to drop 5% below where the last session ended before a new one counts
+      const endF = store.lastEndF, warm = !!(endF && cur.startF > endF * .95);
+      store.lastEndF = Math.round(tF);
+      if (cur.hit && (ranFor >= 20 || gotHit) && warm) setTimeout(() => toast(`Not counted for ranked. Let your ${devWord()} cool down a bit before the next session.`), 1500);
+      if (cur.hit && (ranFor >= 20 || gotHit)){ logSession({ warm: warm || undefined, startF: cur.startF, t:cur.t, p:cur.p, name:cur.name, target:cur.target, peak:Math.round(cur.peak), dur:Math.round((Date.now()-cur.t)/1000), batt:cur.batt, hits:(cur.hits || HIT.hits).slice(0, 20), vapor:(S.profiles[cur.p] || {}).vapor, sc:sinceClean() + 1, run: cur.readyAt ? Math.round((Date.now() - cur.readyAt) / 1000) : null }); }
       cur = null;
     }
   }
@@ -3910,7 +3914,7 @@ const RANK_TIERS = [ { n:'Ember', min:0, c:'#ff6a3d' }, { n:'Flame', min:50, c:'
 const RANK_DIRTY = 120, RANK_DAY_SESS = Infinity; // every session after the first earns its point, no daily limit
 function rankFor(sessions, when){
   const d = new Date(when || Date.now()), m0 = new Date(d.getFullYear(), d.getMonth(), 1).getTime(), m1 = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
-  const ss = sessions.filter(s => s.t >= m0 && s.t < m1 && !(typeof s.run === 'number' && s.run < 20)).sort((a, b) => a.t - b.t); // ranked only counts sessions that ran 20s+
+  const ss = sessions.filter(s => s.t >= m0 && s.t < m1 && !(typeof s.run === 'number' && s.run < 20) && !s.warm).sort((a, b) => a.t - b.t); // ranked only counts sessions that ran 20s+ and started after the chamber cooled 5%
   const r = { rp:0, sessions:0, firsts:0, blinkers:0, extreme:0, dirty:0, sessPts:0, firstPts:0, blinkPts:0 };
   const seen = new Map();
   for (const s of ss){
