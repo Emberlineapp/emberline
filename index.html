@@ -1607,6 +1607,7 @@ body.lt-open main{padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))!i
       <span class="label">Peak lights</span>
       <label class="toggle"><span><b>Lantern</b><br><span class="muted" style="font-size:13px">Ambient glow while idle</span></span><input type="checkbox" class="switch" id="tLantern"></label>
       <div class="row" style="margin:4px 0 8px"><span class="grow muted" style="font-size:13px">Lantern color</span><span class="colorbtn" id="lanternSw" style="background:#ff9d4d"><input type="color" id="lanternColor" value="#ff9d4d" aria-label="Lantern color"></span></div>
+      <div class="row" style="margin:0 0 8px;gap:8px"><span class="grow muted" style="font-size:13px">Lantern mood<br><b id="lanternMoodName" style="color:var(--fg);font-weight:600">None, using the color</b></span><button class="btn small" id="bLanternMood">Pick from Lights</button></div>
       <label class="toggle"><span><b>Stealth mode</b><br><span class="muted" style="font-size:13px">Dims all LEDs in profiles too</span></span><input type="checkbox" class="switch" id="tStealth"></label>
     </div>
     <div class="card" style="display:grid;gap:4px">
@@ -3182,7 +3183,7 @@ async function setLantern(on){
   if (!needLive('use the lantern')){ drawLightsState(); return; }
   S.lantern = on;
   try {
-    if (on){ await writeLanternColor(store.lantern); }
+    if (on){ if (store.lanternMood && S.api !== 2){ try { await ble.writeBlob('/p/app/ltrn/colr', moodPayload(store.lanternMood)); } catch(e){ await writeLanternColor(store.lantern); } } else await writeLanternColor(store.lantern); }
     await ble.write('/p/app/ltrn/cmd', new Uint8Array([on?1:0]));
   } catch(e){ toast('Lantern failed: '+e.message); }
 }
@@ -3673,10 +3674,10 @@ function drawLights(){
   const groups = [...new Set(LED_SCHEMES.map(s => s.g))];
   if ($('#ledSchemes')) $('#ledSchemes').innerHTML = groups.map(g => `<div class="sgroup"><div class="label">${g}</div><div class="swatches">` +
     LED_SCHEMES.map((s,i) => s.g !== g ? '' : `<button class="scheme" data-led="${i}" aria-pressed="${JSON.stringify(s.c)===cur}"><span class="bars">${s.c.map(c=>`<i style="background:${c}"></i>`).join('')}</span><b>${s.n}</b></button>`).join('') + '</div></div>').join('');
-  $('#lanternColor').value = store.lantern; $('#lanternSw').style.background = store.lantern;
+  $('#lanternColor').value = store.lantern; drawLightsState();
   drawLightsState();
 }
-function drawLightsState(){ $('#tLantern').checked = S.lantern; $('#tStealth').checked = S.stealth; }
+function drawLightsState(){ $('#tLantern').checked = S.lantern; $('#tStealth').checked = S.stealth; const n = $('#lanternMoodName'); if (n) n.textContent = store.lanternMood ? store.lanternMood.name || 'Mood' : 'None, using the color'; const sw = $('#lanternSw'); if (sw) sw.style.cssText = store.lanternMood ? swatchStyle(store.lanternMood) : 'background:' + store.lantern; }
 
 function drawCelDev(){
   const el = $('#celDev'); if (!el) return;
@@ -4969,7 +4970,8 @@ $('#profList').addEventListener('click', e => {
 $('#tLantern').onchange = e => setLantern(e.target.checked);
 $('#tStealth').onchange = e => setStealth(e.target.checked);
 $('#lanternColor').oninput = e => { store.lantern = e.target.value; $('#lanternSw').style.background = store.lantern; };
-$('#lanternColor').onchange = async e => { save(); if (S.mode === 'live' && S.lantern){ try { await writeLanternColor(store.lantern); } catch(err){ toast('Lantern color failed'); } } };
+$('#bLanternMood').onclick = () => { moodTarget = 'lantern'; show('lights'); drawMoods(); };
+$('#lanternColor').onchange = async e => { store.lanternMood = null; drawLightsState(); save(); if (S.mode === 'live' && S.lantern){ try { await writeLanternColor(store.lantern); } catch(err){ toast('Lantern color failed'); } } };
 $('#brightList').addEventListener('input', e => { const i = +e.target.dataset.i; if (!brEdit) brEdit = store.bright.slice(); brEdit[i] = +e.target.value; $('#bv'+i).textContent = Math.round(brEdit[i]/2.55) + '%'; if (LT.on){ LT.brDirty = true; ltBar(); ltLiveBright(); } });
 $('#bBright').onclick = applyBrightness;
 $('#ltSave').onclick = ltSave;
@@ -5500,7 +5502,7 @@ function swatchStyle(ref){
 async function writeMoodTo(target, ref){
   const name = ref.name || 'Mood';
   if (target === 'lantern'){
-    store.lanternMood = ref; save();
+    store.lanternMood = ref; save(); drawLightsState(); toast(`${name} picked for the lantern`);
     if (!needLive('light the lantern')) return;
     if (S.api === 2){ await writeLanternColor(moodColors(ref)[0] || '#ffffff'); }
     else await ble.writeBlob('/p/app/ltrn/colr', moodPayload(ref));
