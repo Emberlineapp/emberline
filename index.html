@@ -4151,6 +4151,7 @@ function openPlayer(r){
   };
 }
 
+
 /* ===== badge viewer: tap a badge to see it big ===== */
 function bvKeyNow(t){ const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + ':' + t; }
 function bvResolve(k, row){ return k === 'dev' || k.startsWith('sp:') ? k : k.replace(':now', ':' + rbTierIdx(row && row.tier)); }
@@ -6561,6 +6562,33 @@ setTimeout(claimPrompt, 7000);
 addEventListener('resize', () => moveTabPill(view));
 document.fonts && document.fonts.ready.then(() => moveTabPill(view));
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { applyTheme(); draw(); });
+
+/* ---- What's new: shows once per update ---- */
+const WN_VER = '2026-10-proxy';
+const WN_ITEMS = [
+  ['Proxy support', 'Emberline now works with the Puffco Proxy: temps, battery, sessions, hit timer, blinkers, colors, moods, zones, brightness and the lantern.'],
+  ['Randomizer', 'Tap Shuffle at the top of Lights for a random color combo and effect. Keep the ones you like.'],
+  ['Gear on profiles', 'Profiles now show which Puffcos people use.']
+];
+function whatsNew(force){
+  if (!force && store.wnSeen === WN_VER) return;
+  if (!force && !store.wnSeen && !(store.sessions || []).length && !store.lastDeviceId){ store.wnSeen = WN_VER; save(); return; } // brand-new users don't need a changelog
+  if (document.querySelector('.egg')) return;
+  store.wnSeen = WN_VER; save();
+  const el = document.createElement('div'); el.className = 'egg';
+  el.innerHTML = `<div class="egg-card" role="dialog" aria-label="What's new" style="text-align:left;justify-items:stretch;gap:12px;max-height:86vh;overflow:auto">
+    <span class="label" style="text-align:center">Update</span>
+    <h2 style="text-align:center;margin:0">What’s new</h2>
+    ${WN_ITEMS.map(([t, d]) => `<div style="display:grid;gap:2px"><b>${t}</b><span class="muted" style="font-size:14px">${d}</span></div>`).join('')}
+    <button class="btn primary" id="wnGo" style="width:100%">Nice</button></div>`;
+  document.body.appendChild(el); applyHaptics();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  const opened = Date.now();
+  el.querySelector('#wnGo').addEventListener('click', () => { if (Date.now() - opened < 500) return; el.classList.remove('on'); setTimeout(() => el.remove(), 260); });
+}
+// wait until the welcome and any other popup are gone, then show it
+(function wnWait(n){ if (store.wnSeen === WN_VER || n > 40) return; const busy = greetOpen || document.getElementById('spl') || document.querySelector('.egg') || [...document.querySelectorAll('.welcome, #welcome')].some(w => !w.hidden && getComputedStyle(w).display !== 'none' && w.childElementCount > 0); // fixed popups have no offsetParent, so check display instead
+  if (busy) setTimeout(() => wnWait(n + 1), 1000); else setTimeout(() => { const still = greetOpen || document.getElementById('spl') || [...document.querySelectorAll('.welcome, #welcome')].some(w => !w.hidden && getComputedStyle(w).display !== 'none' && w.childElementCount > 0); if (!still) whatsNew(); else wnWait(n + 1); }, 2500); })(0);
 </script>
 
 </body></html>
