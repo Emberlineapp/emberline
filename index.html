@@ -2161,6 +2161,8 @@ class Lorax {
   intScale(path){
     // Proxy units (from the device inspector): temps in tenths of °C, times in hundredths of a second,
     // battery in hundredths of a percent, volts in millivolts
+    if (/tmpo/.test(path)) return 10;                              // boost temp
+    if (/timo/.test(path)) return 200;                             // boost time
     if (/intn|lbrt/.test(path)) return 256;                       // vapor setting, brightness
     if (/temp|btmp|tcmd/.test(path)) return 10;
     if (/elap|tott|time|btim|mbct/.test(path)) return 200;         // Puffco web app: times are seconds x 200
@@ -3129,11 +3131,24 @@ function markCleaned(){
 }
 
 /* ================= actions ================= */
+// Boost the way the Puffco app does it: write the total added temp (°C) and time (s) to the override paths
+const BOOST = { temp: 0, time: 0 };
+async function boostCmd(){
+  if (!needLive('boost')) return;
+  if (!isProxy()) return modeCmd(9); // the Peak's own boost button command
+  const p = S.profiles[S.active] || {}, addC = (p.boostF || 0) * 5 / 9, addS = p.boostT || 0;
+  try {
+    if (addC > 0){ BOOST.temp += addC; await ble.wf32('/p/app/tmpo', BOOST.temp); }
+    if (addS > 0){ BOOST.time += addS; await ble.wf32('/p/app/timo', BOOST.time); }
+    buzz(15); toast(`Boosted +${store.unit === 'F' ? Math.round(p.boostF || 0) + '°F' : Math.round(addC) + '°C'} +${addS}s`);
+  } catch(e){ toast('Boost failed: ' + (e.message || e)); }
+}
 async function modeCmd(code){
   if (S.mode === 'live'){ try { await ble.write('/p/app/mc', new Uint8Array([code])); if (code === 8 && isProxy()){ await sleep(100); await ble.write('/p/app/mc', new Uint8Array([2])); } } catch(e){ toast('Command failed: '+e.message); } }
   else needLive('use it');
 }
 async function selectProfile(i){
+  if (S.mode === 'live' && (S.state === 7 || S.state === 8)){ if (i !== S.active) toast('You can switch profiles after this session'); return; } // no switching mid-session
   S.active = i; hcsHold = Date.now() + 1500; render();
   if (S.mode === 'live'){ try { await ble.write('/p/app/hcs', new Uint8Array([i])); applyProfileBright(i); previewProfile(i); } catch(e){ toast('Could not switch profile'); } }
 }
@@ -3611,12 +3626,12 @@ function drawHome(){
   const left = Math.max(0, Math.round(S.total - S.elapsed));
   setHTML($('#gTimer'), S.state === 8 ? `${left}s left` : S.state === 7 ? 'Heating up…' : live && S.charging ? chargeLine() : '&nbsp;');
   { const h = hitText(), g = $('#gHit'); if (g.innerHTML !== h) g.innerHTML = h; }
-  const heating = S.state >= 7 && S.state <= 9;
-  $('#bStart').disabled = (live && heating) || (live && !isProxy() && S.chamber === 0) || (!live && (C.state === 'connecting' || C.state === 'reconnecting'));
-  if (live && heating) holdWake(); else releaseWake(); $('#bStop').disabled = !heating; $('#bBoost').disabled = !heating;
-  { const act = $('#bStart').parentElement, run = live && heating; if (act.classList.contains('run') !== run){ act.classList.toggle('run', run); act.classList.remove('morph'); void act.offsetWidth; act.classList.add('morph'); } }
+  const heating = S.state >= 7 && S.state <= 9, running = S.state === 7 || S.state === 8; // 9 = just finished: you can start the next one right away
+  $('#bStart').disabled = (live && running) || (live && !isProxy() && S.chamber === 0) || (!live && (C.state === 'connecting' || C.state === 'reconnecting'));
+  if (live && heating) holdWake(); else releaseWake(); $('#bStop').disabled = !heating; $('#bBoost').disabled = !running;
+  { const act = $('#bStart').parentElement, run = live && running; if (act.classList.contains('run') !== run){ act.classList.toggle('run', run); act.classList.remove('morph'); void act.offsetWidth; act.classList.add('morph'); } }
 
-  if (!$('#homeChips').classList.contains('gd-on')) setHTML($('#homeChips'), S.profiles.map((q,i) => `<button class="pchip" data-p="${i}" aria-pressed="${i===S.active}"><b><span class="sw" style="background:${q.pal && q.pal.length > 1 ? `conic-gradient(${q.pal.concat(q.pal[0]).join(',')})` : q.color}"></span>${esc(q.name)}</b><span>${fmtT(q.tempC)}°</span></button>`).join(''));
+  if (!$('#homeChips').classList.contains('gd-on')) setHTML($('#homeChips'), S.profiles.map((q,i) => `<button class="pchip" data-p="${i}" aria-pressed="${i===S.active}" ${live && running && i !== S.active ? 'disabled style="opacity:.4"' : ''}><b><span class="sw" style="background:${q.pal && q.pal.length > 1 ? `conic-gradient(${q.pal.concat(q.pal[0]).join(',')})` : q.color}"></span>${esc(q.name)}</b><span>${fmtT(q.tempC)}°</span></button>`).join(''));
 
   const n = sinceClean(), every = store.cleanEvery, pct = clamp(n/every, 0, 1);
   $('#cleanTxt').textContent = `${n} / ${every}`;
@@ -4938,9 +4953,9 @@ $('#connBtn').addEventListener('click', () => {
   if (C.state === 'unsupported'){ show('home'); return; }
   startConnect(false);
 });
-$('#bStart').onclick = () => S.mode === 'live' ? modeCmd(7) : startConnect(false);
+$('#bStart').onclick = async () => { if (S.mode !== 'live') return startConnect(false); BOOST.temp = 0; BOOST.time = 0; try { await ble.write('/p/app/hcs', new Uint8Array([S.active])); } catch(e){} modeCmd(7); }; // like the Puffco app: pick the profile, then start
 $('#bStop').onclick = () => modeCmd(8);
-$('#bBoost').onclick = () => modeCmd(9);
+$('#bBoost').onclick = () => boostCmd();
 { // first tap asks "Are you sure?" in the same button, second tap marks it
   const bc = $('#bCleaned'); let armT = 0;
   const label = t => { const n = [...bc.childNodes].find(x => x.nodeType === 3); if (n) n.nodeValue = t; else bc.prepend(t); };
