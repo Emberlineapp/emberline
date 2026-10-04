@@ -25,7 +25,8 @@
 .last-sess{display:grid;gap:8px;padding:12px 14px;border-radius:16px;background:var(--fill,rgba(255,255,255,.06))}
 .ls-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;text-align:center}
 .ls-grid b{display:block;font-size:17px;font-variant-numeric:tabular-nums}.ls-grid span{font-size:11px;color:var(--muted,#a1a1a6)}
-.shareb{width:44px;height:44px;padding:0;display:grid;place-items:center;border-radius:50%}
+.shareb{position:relative;flex:none;width:48px;height:48px;min-width:48px;padding:0!important;border-radius:50%}
+#shareBtn.shareb svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);margin:0}
 #shareBtn.shareb svg{width:24px!important;height:24px!important;min-width:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 </style></head><body>
 <div class="spl" id="spl" aria-label="Loading Emberline" role="status">
