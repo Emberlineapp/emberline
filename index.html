@@ -22,6 +22,9 @@
 @keyframes splUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes splSlide{from{transform:translateX(-110%)}to{transform:translateX(280%)}}
 @media (prefers-reduced-motion:reduce){.spl *,.spl::before{animation:none!important;opacity:1!important}}
+.last-sess{display:grid;gap:8px;padding:12px 14px;border-radius:16px;background:var(--fill,rgba(255,255,255,.06))}
+.ls-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;text-align:center}
+.ls-grid b{display:block;font-size:17px;font-variant-numeric:tabular-nums}.ls-grid span{font-size:11px;color:var(--muted,#a1a1a6)}
 </style></head><body>
 <div class="spl" id="spl" aria-label="Loading Emberline" role="status">
   <div class="spl-in">
@@ -3967,6 +3970,19 @@ function myRank(){
   return Object.assign({}, r, { rp, blinkers: Math.max(r.blinkers, me.blinkers || 0), tier: RANK_TIERS.slice().reverse().find(t => rp >= t.min), next: RANK_TIERS.find(t => t.min > rp) || null, synced: true });
 }
 function drawRank(){ drawRankInner(); applyHaptics(); }
+// "Last session" box on the rank card: what you did and what it was worth
+function lastSessionHtml(){
+  const all = rankSessions().slice().sort((a, b) => a.t - b.t), s = all[all.length - 1]; if (!s) return '';
+  const hits = s.hits || [], best = hits.length ? Math.max(...hits) : 0, blinks = hits.filter(h => h >= 8).length;
+  const m0 = new Date(); m0.setDate(1); m0.setHours(0, 0, 0, 0);
+  let rp = 0; try { if (s.t >= m0.getTime()) rp = rankFor(all).rp - rankFor(all.slice(0, -1)).rp; } catch(e){}
+  const mins = Math.round((Date.now() - s.t) / 60000), when = mins < 1 ? 'just now' : mins < 60 ? mins + 'm ago' : mins < 1440 ? Math.round(mins / 60) + 'h ago' : new Date(s.t).toLocaleDateString([], { month:'short', day:'numeric' });
+  const len = typeof s.run === 'number' ? s.run : s.dur || 0;
+  const why = s.warm ? 'Not counted: started before your chamber cooled' : typeof s.run === 'number' && s.run < 20 ? 'Not counted: shorter than 20s' : s.t < m0.getTime() ? 'From last month' : '';
+  return `<div class="last-sess"><div class="row between"><span class="label">Last session</span><span class="muted" style="font-size:12px">${esc(s.name || 'Session')} · ${when}</span></div>
+    <div class="ls-grid"><div><b>${rp > 0 ? '+' + rp : rp}</b><span>RP</span></div><div><b>${hits.length}</b><span>hit${hits.length === 1 ? '' : 's'}</span></div><div><b>${best ? best.toFixed(1) + 's' : '-'}</b><span>best hit</span></div><div><b>${blinks}</b><span>blinker${blinks === 1 ? '' : 's'}</span></div><div><b>${len ? len + 's' : '-'}</b><span>length</span></div></div>
+    ${why ? `<p class="muted" style="margin:0;font-size:12px">${why}</p>` : ''}</div>`;
+}
 function drawRankInner(){
   const el = $('#rankCard'); if (!el) return;
   const r = myRank(), t = r.tier, nx = r.next;
@@ -3986,6 +4002,7 @@ function drawRankInner(){
       ${r.extreme ? `<div><span>Extreme bonus (included above)</span><b>+${r.extreme}</b></div>` : ''}
       ${r.dirty ? `<div class="neg"><span>Dabs past ${RANK_DIRTY} without cleaning · ${r.dirty}</span><b>−${r.dirty}</b></div>` : ''}
     </div>
+    ${lastSessionHtml()}
     ${dirtyNow ? `<div class="banner warn" style="padding:10px 14px;font-size:14px"><div class="grow"><b>Losing points</b>Every dab costs 1 RP until you clean.</div></div>` : ''}
     ${(() => { const h = badgeHistory(), dev = LB.me && LB.me.dev; if (!h.length && !dev) return '';
         return `<div class="rb-shelf-wrap"><span class="label">Your badges</span><div class="rb-shelf">${dev ? `<div class="rb-item" data-bv="dev">${devBadge(54)}<span>Developer</span></div>` : ''}${h.map(b => `<div class="rb-item" data-bv="${b.y}-${String(b.m + 1).padStart(2, '0')}:${b.t}">${rankBadge(b.m, b.t, 58, b.y)}<span>${RB_MONTHS[b.m].slice(0, 3)} · ${RB_TIERS[b.t].n}</span></div>`).join('')}</div></div>`; })()}
