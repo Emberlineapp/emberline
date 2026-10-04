@@ -25,6 +25,8 @@
 .last-sess{display:grid;gap:8px;padding:12px 14px;border-radius:16px;background:var(--fill,rgba(255,255,255,.06))}
 .ls-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;text-align:center}
 .ls-grid b{display:block;font-size:17px;font-variant-numeric:tabular-nums}.ls-grid span{font-size:11px;color:var(--muted,#a1a1a6)}
+.shareb{width:44px;height:44px;padding:0;display:grid;place-items:center;border-radius:50%}
+#shareBtn.shareb svg{width:24px!important;height:24px!important;min-width:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 </style></head><body>
 <div class="spl" id="spl" aria-label="Loading Emberline" role="status">
   <div class="spl-in">
@@ -1528,6 +1530,7 @@ body.lt-open main{padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))!i
 <header>
   <div class="hdr">
     <span class="navbtn batt" id="batt" title="Battery"><i><b style="width:80%"></b></i><span>80%</span><span class="skin-hearts" id="skinHearts" aria-hidden="true"></span></span>
+    <button class="navbtn shareb" id="shareBtn" aria-label="Share Emberline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v6.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V12"/></svg></button>
     <button class="devsw" id="devSw" aria-haspopup="true" aria-expanded="false"><span class="brand" id="devName">Emberline<small id="devSub">Peak Pro controller</small></span><svg class="devchev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></button>
     <button class="navbtn pill off" id="connBtn"><span class="dot"></span><span id="connTxt">Connect</span></button>
   </div>
@@ -3581,6 +3584,7 @@ function draw(){
   $('#devName').firstChild.textContent = S.mode === 'live' ? (S.devName || S.name) : 'Emberline';
     $('#devSub').textContent = S.mode === 'live' ? (isProxy() ? `Proxy${S.charging ? ' · charging' : ''}` : `${S.edition ? S.edition + ' ' : ''}Peak Pro · ${CHAMBERS[S.chamber] ?? 'Chamber ?'}${S.charging ? ' · charging' : ''}`) : S.mode === 'demo' ? `Demo mode · ${isProxy() ? 'Proxy' : CHAMBERS[S.chamber] ?? '3D Chamber'}` : 'Not connected';
   const bt = $('#batt'); bt.style.visibility = 'visible'; bt.hidden = !(S.mode === 'live' && S.battery != null); // hidden takes no space, so the device name gets the room
+  { const sb = $('#shareBtn'); if (sb) sb.hidden = !bt.hidden; } // share sits where the battery goes when nothing's connected
   bt.querySelector('b').style.width = (S.battery || 0) + '%';
   bt.querySelector('b').style.background = S.battery < 20 ? 'var(--bad)' : S.battery < 40 ? 'var(--warn)' : 'var(--good)';
   bt.querySelector('span').textContent = S.battery + '%';
@@ -4568,19 +4572,21 @@ async function socLoad(){
   const me = LB.me;
   if (!me || !me.id){ if (lbUsesPuffco() && !LB.me) { const p = await lbRestore(); if (p) return socLoad(); } return; }
   const c = await socCounts(me.id);
-  SOC.myCounts = c; SOC.following = new Set(c.followingIds); SOC.loaded = true;
+  SOC.myCounts = c; SOC.following = new Set(c.followingIds); SOC.followerSet = new Set(c.followerIds); SOC.loaded = true;
   socSetMyCounts(); drawBadgeBook();
   SOC.followingRows = await socPlayers(c.followingIds);
   socDrawFollowing(); socPaintAllFollow();
 }
 // flip every Follow button for this person in place (no redraw, so nothing jumps)
+// you follow them and they follow you = Friends
+function followLabel(id){ const on = SOC.following.has(id), back = SOC.followerSet && SOC.followerSet.has(id); return on && back ? 'Friends' : on ? 'Following' : back ? 'Follow back' : 'Follow'; }
 function socPaintFollow(id){
   const on = SOC.following.has(id);
   document.querySelectorAll(`[data-follow="${id}"]`).forEach(btn => {
     const sw = btn.querySelector(':scope > .hz');
     btn.classList.toggle('primary', !on); btn.classList.toggle('on', on);
     [...btn.childNodes].forEach(n => { if (n.nodeType === 3) n.remove(); });
-    btn.insertBefore(document.createTextNode(on ? 'Following' : 'Follow'), sw || null);
+    btn.insertBefore(document.createTextNode(followLabel(id)), sw || null);
   });
 }
 function socPaintAllFollow(){ new Set([...document.querySelectorAll('[data-follow]')].map(b => b.dataset.follow)).forEach(socPaintFollow); }
@@ -4609,7 +4615,7 @@ function socRow(r){
   const meId = LB.me && LB.me.id, on = SOC.following.has(r.id);
   return `<div class="soc-row" data-soc="${r.id}" role="button" tabindex="0">${lbAvatar(r.avatar_url, r.username, 42)}
     <span class="soc-name"><b>${esc(r.username)}${r.dev ? devBadge(18) : ''}</b><small style="color:${lbTierColor(r.tier)}">${esc(r.tier || 'Ember')}${r.bio ? ` <span class="muted">· ${esc(r.bio.slice(0, 40))}${r.bio.length > 40 ? '…' : ''}</span>` : ''}</small></span>
-    ${meId && r.id !== meId ? `<button class="btn small ${on ? 'on' : 'primary'} soc-follow" data-follow="${r.id}">${on ? 'Following' : 'Follow'}</button>` : ''}</div>`;
+    ${meId && r.id !== meId ? `<button class="btn small ${on ? 'on' : 'primary'} soc-follow" data-follow="${r.id}">${followLabel(r.id)}</button>` : ''}</div>`;
 }
 function drawSocial(){
   const meEl = $('#socMe'); if (!meEl) return;
@@ -4973,6 +4979,12 @@ $('#connBtn').addEventListener('click', () => {
 $('#bStart').onclick = async () => { if (S.mode !== 'live') return startConnect(false); BOOST.temp = 0; BOOST.time = 0; try { await ble.write('/p/app/hcs', new Uint8Array([S.active])); } catch(e){} modeCmd(7); }; // like the Puffco app: pick the profile, then start
 $('#bStop').onclick = () => modeCmd(8);
 $('#bBoost').onclick = () => boostCmd();
+$('#shareBtn').onclick = async () => {
+  const url = 'https://emberlineapp.github.io/emberline/', data = { title:'Emberline', text:'Emberline: a free, faster app for the Puffco Peak Pro and Proxy. Open it in the Path browser.', url };
+  try { if (navigator.share){ await navigator.share(data); return; } } catch(e){ if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(url); toast('Link copied. Paste it to share Emberline'); }
+  catch(e){ const t = document.createElement('textarea'); t.value = url; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); toast('Link copied. Paste it to share Emberline'); } catch(_){ toast(url); } t.remove(); }
+};
 { // first tap asks "Are you sure?" in the same button, second tap marks it
   const bc = $('#bCleaned'); let armT = 0;
   const label = t => { const n = [...bc.childNodes].find(x => x.nodeType === 3); if (n) n.nodeValue = t; else bc.prepend(t); };
