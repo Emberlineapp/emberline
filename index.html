@@ -4527,6 +4527,7 @@ function spbStatus(){
   out.discord = { got: aw.includes('discord') };
   out.bughunter = { got: aw.includes('bughunter') };
   out.secret = { got: ss.some(x => { const d = new Date(x.t); return (d.getHours() % 12) === 4 && d.getMinutes() === 20; }) };
+  aw.forEach(id => { out[id] = Object.assign({}, out[id], { got: true }); }); // badges given by hand in Supabase (players.awards) always count
   return out;
 }
 function drawBadgeBook(){
