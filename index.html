@@ -3056,8 +3056,12 @@ async function poll(){
     try { S.tempC = await ble.f32('/p/app/htr/temp'); } catch(e){ try { S.tempC = await ble.f32('/p/htr/temp'); } catch(e2){} }
     // while Ready, keep the Bluetooth line clear for the inhale sensor: read the timer every other tick and skip the rest
     const hitting = S.state === 8 && HIT.loop, odd = (slowTick & 1) === 1;
-    if (S.state >= 7 && S.state <= 9 && (!hitting || odd)){
-      try { S.elapsed = await ble.f32('/p/app/stat/elap'); if (!hitting || !S.total) S.total = await ble.f32('/p/app/stat/tott'); } catch(e){}
+    if (S.state !== prev){ S.elapsed = 0; S.elapsedAt = performance.now(); S.totalFor = -1; if (S.state === 8) S.total = (S.profiles[S.active] || {}).time || S.total; } // new phase: don't show the last phase's timer
+    if (S.state >= 7 && S.state <= 9 && (!hitting || odd || S.totalFor !== S.state)){
+      try {
+        S.elapsed = await ble.f32('/p/app/stat/elap'); S.elapsedAt = performance.now();
+        if (!hitting || S.totalFor !== S.state || slowTick % 8 === 1){ const t = await ble.f32('/p/app/stat/tott'); if (t > 0){ S.total = t; S.totalFor = S.state; } } // the preheat total isn't the session total
+      } catch(e){}
       if (!hitting){ try { const t = await ble.f32('/p/app/htr/tcmd'); if (t > 100 && t < 400) S.liveTargetC = t; } catch(e){} }
     }
     if (Date.now() > hcsHold && !hitting){ try { const a = await ble.u8('/p/app/hcs'); if (a <= 3 && a !== S.active){ S.active = a; applyProfileBright(a); if (view === 'prof') drawProfiles(); } } catch(e){} }
@@ -3663,7 +3667,7 @@ function drawHome(){
     else delete wrap.dataset.exit;
     wrap.dataset.mode = mode;
   }
-  if (mode === 'ready'){ const t = $('#lgTime'), l = Math.max(0, Math.round(S.total - S.elapsed)) + 's'; if (t.textContent !== l) t.textContent = l; }
+  if (mode === 'ready'){ const t = $('#lgTime'), l = Math.max(0, Math.round(S.total - liveElapsed())) + 's'; if (t.textContent !== l) t.textContent = l; }
   $('.ambient').classList.toggle('session', mode !== 'idle');
   const cl = $('#cluster'); if (cl.dataset.mode !== mode){ cl.dataset.mode = mode; $('#ckStage').dataset.mode = mode; }
   cl.style.setProperty('--pc', p.color);
@@ -3683,7 +3687,7 @@ function drawHome(){
   const st = $('#gState'); st.textContent = live ? (STATE_NAMES[S.state] || 'Idle') : C.state === 'reconnecting' ? 'Reconnecting' : 'Not connected';
   st.className = 'state-chip' + (live && (S.state === 7 || S.state === 9) ? ' heat' : live && S.state === 8 ? ' ready' : '');
   { const b = $('#bStart'), t = live ? 'Start' : 'Connect', n = [...b.childNodes].find(x => x.nodeType === 3); if (n){ if (n.nodeValue !== t) n.nodeValue = t; } else b.prepend(t); }
-  const left = Math.max(0, Math.round(S.total - S.elapsed));
+  const left = Math.max(0, Math.round(S.total - liveElapsed()));
   setHTML($('#gTimer'), S.state === 8 ? `${left}s left` : S.state === 7 ? 'Heating up…' : live && S.charging ? chargeLine() : '&nbsp;');
   { const h = hitText(), g = $('#gHit'); if (g.innerHTML !== h) g.innerHTML = h; }
   const heating = S.state >= 7 && S.state <= 9, running = S.state === 7 || S.state === 8; // 9 = just finished: you can start the next one right away
@@ -5329,7 +5333,7 @@ function updateCluster(){
   set('#ckGear', GEAR[S.state] || 'P');
   set('#ckMode', (p.name || 'Profile').toUpperCase().slice(0, 12));
   set('#ckModeSub', `${isProxy() ? 'PROXY' : (CHAMBERS[S.chamber] || '').toUpperCase()} · ${vaporName(p.vapor).toUpperCase()} · ${p.time}s`);
-  const left = Math.max(0, Math.round(S.total - S.elapsed));
+  const left = Math.max(0, Math.round(S.total - liveElapsed()));
   set('#ckStatus', S.state === 8 && HIT.on ? `HIT ${HIT.live.toFixed(1)}` : S.state === 8 ? `${left}s` : (STATE_NAMES[S.state] || 'Idle').toUpperCase());
   const lerp = (a, b, k) => a + (b - a) * k;
   const bf = clamp((S.battery || 0) / 100, 0, 1), cf = clamp(sinceClean() / store.cleanEvery, 0, 1);
@@ -6499,11 +6503,12 @@ function setProfileColor(hex, pal){
   $('#gStop0').setAttribute('stop-color', second); $('#gStop1').setAttribute('stop-color', hex);
 }
 const G = { frac:0, temp:22, glow:0, shown:null };
+function liveElapsed(){ const e = +S.elapsed || 0; if (S.mode !== 'live' || S.state !== 8 || !S.elapsedAt) return e; return e + Math.min(1.5, (performance.now() - S.elapsedAt) / 1000); } // glide between Bluetooth reads
 const ARC = 433.5, R = 92, CX = 110, CY = 110;
 function gaugeTarget(){
   if (S.mode !== 'live') return 0;
   const p = S.profiles[S.active], tgt = p.tempC;
-  if (S.state === 8 && S.total > 0) return clamp((S.total - S.elapsed) / S.total, 0, 1);  // ready: ring counts down
+  if (S.state === 8 && S.total > 0) return clamp((S.total - liveElapsed()) / S.total, 0, 1);  // ready: ring counts down
   return clamp((S.tempC - 20) / (tgt - 20), 0, 1);                                         // heating / cooling: ring shows temp
 }
 function gaugeLoop(){
