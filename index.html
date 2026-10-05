@@ -3603,7 +3603,7 @@ function chargeLine(){
 function draw(){
   // header
   $('#devName').firstChild.textContent = S.mode === 'live' ? (S.devName || S.name) : 'Emberline';
-    $('#devSub').textContent = S.mode === 'live' ? (isProxy() ? `Proxy${S.charging ? ' · charging' : ''}` : `${S.edition ? S.edition + ' ' : ''}Peak Pro · ${CHAMBERS[S.chamber] ?? 'Chamber ?'}${S.charging ? ' · charging' : ''}`) : S.mode === 'demo' ? `Demo mode · ${isProxy() ? 'Proxy' : CHAMBERS[S.chamber] ?? '3D Chamber'}` : 'Not connected';
+    $('#devSub').textContent = S.mode === 'live' ? (isProxy() ? `Proxy${S.charging ? ' · charging' : ''}` : `${S.edition ? S.edition + ' ' : ''}${['Opal', 'Indiglow', 'Guardian'].includes(S.edition) ? 'Peak' : 'Peak Pro'} · ${CHAMBERS[S.chamber] ?? 'Chamber ?'}${S.charging ? ' · charging' : ''}`) : S.mode === 'demo' ? `Demo mode · ${isProxy() ? 'Proxy' : CHAMBERS[S.chamber] ?? '3D Chamber'}` : 'Not connected';
   const bt = $('#batt'); bt.style.visibility = 'visible'; bt.hidden = !(S.mode === 'live' && S.battery != null); // hidden takes no space, so the device name gets the room
   { const sb = $('#shareBtn'); if (sb) sb.hidden = !bt.hidden; } // share sits where the battery goes when nothing's connected
   bt.querySelector('b').style.width = (S.battery || 0) + '%';
@@ -4129,7 +4129,7 @@ function gearHtml(list, empty){
     ? '<svg viewBox="0 0 24 24"><path d="M10 3h4l1 5H9z"/><rect x="7" y="8" width="10" height="3" rx="1"/><rect x="7" y="11" width="10" height="10" rx="3"/></svg>'
     : '<svg viewBox="0 0 24 24"><path d="M10 2h4v9h-4z"/><path d="M8 11h8l1 3H7z"/><rect x="6" y="14" width="12" height="8" rx="2"/></svg>';
   const ed = k => k.includes(':') ? k.split(':')[1] : '';
-  const name = k => (k.startsWith('proxy') ? 'Proxy' : 'Peak Pro') + (ed(k) ? ' · ' + ed(k) : '');
+  const name = k => (k.startsWith('proxy') ? 'Proxy' : ['Opal', 'Indiglow', 'Guardian'].includes(ed(k)) ? 'Peak' : 'Peak Pro') + (ed(k) ? ' · ' + ed(k) : ''); // Opal, Indiglow and Guardian are original Peaks
   const chip = k => { const st = EDITION_STYLE[ed(k)]; if (!st) return `<span class="gear-chip">${ic(k)}${esc(name(k))}</span>`;
     return `<span class="gear-chip ed${st.light ? ' light' : ''}" style="--e1:${st.c[0]};--e2:${st.c[1]}">${ic(k)}${esc(name(k))}${LIMITED_ED.includes(ed(k)) ? '<small>Limited</small>' : ''}</span>`; };
   return `<div class="gear"><span class="label">Gear</span><div class="gear-list">${list.map(chip).join('')}</div></div>`;
@@ -5631,7 +5631,7 @@ async function writeMoodTo(target, ref){
   const i = target, p = S.profiles[i];
   p.mood = ref; { const mc = moodColors(ref).filter((c, k, a) => a.indexOf(c) === k); p.color = pickAccent(mc) || p.color; p.pal = mc.filter(c => Math.max(...hexBytes(c)) > 40).slice(0, 6); }
   if (S.mode !== 'live'){ p.lightDirty = true; toast(`${name} saved on ${p.name}. It goes to your ${devWord()} when you connect and save.`); render(); return; }
-  if (S.api === 2){ await writeProfileColor(i, p.color); toast('This firmware only supports solid colors, so the first color was used'); return; }
+  if (S.api === 2){ await writeProfileColor(i, p.color); toast(['Opal', 'Indiglow', 'Guardian'].includes(S.edition) ? `The original Peak only shows solid colors, so ${p.name} is set to the mood's main color` : `Your Peak's firmware only shows solid colors, so ${p.name} is set to the mood's main color. Update it in the Puffco app to get animated moods.`); return; }
   const blob = moodPayload(ref);
   await ble.writeBlob(`/u/app/hc/${i}/colr`, blob);
   if (S.active === i){ try { await ble.writeBlob('/p/app/thc/colr', blob); } catch(e){} }
