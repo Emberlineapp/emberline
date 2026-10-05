@@ -2569,7 +2569,8 @@ async function afterConnect(quick){
     try { await readProfiles(); render(); if (view === 'prof') drawProfiles(); } catch(e){}
     try { await applyProfileBright(S.active); } catch(e){}
     try { await readDeviceInfo(); render(); rememberDevice(); save(); } catch(e){}
-    setTimeout(() => { try { edShareAsk(); } catch(e){} }, 9000); // limited edition owners: offer to share the edition's lights
+    setTimeout(() => { try { edShareAsk(); } catch(e){} }, 9000);
+    setTimeout(() => { try { ogPeakNotice(0); } catch(e){} }, 2500); // original Peak / older firmware: let them know support is coming // limited edition owners: offer to share the edition's lights
     // mood shuffle catch-up: if the Puffco did sessions while Emberline was closed (dab count went up), pick fresh moods now
     try { if (store.shuffle && S.odo != null){ if (store.shufOdo != null && S.odo > store.shufOdo){ Object.keys(store.shuffle).forEach(k => { if (store.shuffle[k].on) setTimeout(() => shuffleNext(+k), 1500 + 600 * k); }); } store.shufOdo = S.odo; save(); } } catch(e){}
     { const g = myGear().join(); if (g && g !== store.gearSent){ store.gearSent = g; save(); try { await lbPush(true); } catch(e){} } } // share your gear on your profile as soon as a new device connects
@@ -6832,6 +6833,25 @@ function edShareAsk(force){
   const st = (store.edShare || {})[S.edition];
   if (!force && st && st.ok && Date.now() - st.at < 7 * 864e5) return; // shared recently
   edShareSend().then(ok => { if (force) toast(ok ? `${S.edition} lights shared` : 'Could not read the lights'); }).catch(e => { if (force) toast('Share failed: ' + (e.message || e)); });
+}
+let ogNoticeShown = false;
+function ogPeakNotice(n){
+  if (ogNoticeShown || S.mode !== 'live') return;
+  const og = S.api === 2 || ['OG', 'Opal', 'Indiglow', 'Guardian'].includes(S.edition);
+  if (!og) return;
+  if ((document.querySelector('.egg') || greetOpen) && n < 20){ setTimeout(() => ogPeakNotice(n + 1), 1500); return; } // wait for other popups
+  ogNoticeShown = true;
+  const name = S.edition && S.edition !== 'OG' ? 'Peak ' + S.edition : 'original Peak';
+  const el = document.createElement('div'); el.className = 'egg';
+  el.innerHTML = `<div class="egg-card" role="dialog" aria-label="Support update" style="gap:12px">
+    <span class="label">Heads up</span>
+    <h2 style="margin:0">Full support is coming</h2>
+    <p class="muted" style="margin:0;font-size:14px">Full support for your ${esc(name)} is being added. Some features like animated moods may not work yet. Thank you for your patience!</p>
+    <button class="btn primary" id="ogOk" style="width:100%">Got it</button></div>`;
+  document.body.appendChild(el); applyHaptics();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  const opened = Date.now();
+  el.querySelector('#ogOk').addEventListener('click', () => { if (Date.now() - opened < 400) return; el.classList.remove('on'); setTimeout(() => el.remove(), 260); });
 }
 const WN_ITEMS = [
   ['Preheat light', 'Pick a color or any mood (yours or Puffco’s) to show while a profile heats up. Find it on each profile in Profiles.'],
