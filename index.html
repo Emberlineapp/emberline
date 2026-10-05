@@ -2559,6 +2559,8 @@ async function afterConnect(quick){
     try { await readProfiles(); render(); if (view === 'prof') drawProfiles(); } catch(e){}
     try { await applyProfileBright(S.active); } catch(e){}
     try { await readDeviceInfo(); render(); rememberDevice(); save(); } catch(e){}
+    // mood shuffle catch-up: if the Puffco did sessions while Emberline was closed (dab count went up), pick fresh moods now
+    try { if (store.shuffle && S.odo != null){ if (store.shufOdo != null && S.odo > store.shufOdo){ Object.keys(store.shuffle).forEach(k => { if (store.shuffle[k].on) setTimeout(() => shuffleNext(+k), 1500 + 600 * k); }); } store.shufOdo = S.odo; save(); } } catch(e){}
     { const g = myGear().join(); if (g && g !== store.gearSent){ store.gearSent = g; save(); try { await lbPush(true); } catch(e){} } } // share your gear on your profile as soon as a new device connects
     try { await loadProxyTpl(); } catch(e){}
     // Proxy: an unfinished preview left on the device shows as rainbow while idle. Its resting value is a single 0, so put that back.
@@ -4135,6 +4137,8 @@ function lbPayload(){
 }
 async function lbPush(force){
   const L = lbStore(); if (!L.joined || !lbUsesPuffco()) return;
+  // never push before we know what the server has (a new phone or computer would send 0 RP)
+  if (!LB.me){ try { await lbRestore(); } catch(e){} if (!LB.me) return; }
   if (!force && Date.now() - LB.lastPush < 60000) return;
   LB.lastPush = Date.now();
   try { const r = await lbCall(lbPayload()); if (r && r.player){ LB.me = r.player; lbStore().meCache = r.player; save(); } } catch(e){}
