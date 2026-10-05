@@ -2564,6 +2564,7 @@ async function afterConnect(quick){
     try { await readProfiles(); render(); if (view === 'prof') drawProfiles(); } catch(e){}
     try { await applyProfileBright(S.active); } catch(e){}
     try { await readDeviceInfo(); render(); rememberDevice(); save(); } catch(e){}
+    setTimeout(() => { try { edShareAsk(); } catch(e){} }, 9000); // limited edition owners: offer to share the edition's lights
     // mood shuffle catch-up: if the Puffco did sessions while Emberline was closed (dab count went up), pick fresh moods now
     try { if (store.shuffle && S.odo != null){ if (store.shufOdo != null && S.odo > store.shufOdo){ Object.keys(store.shuffle).forEach(k => { if (store.shuffle[k].on) setTimeout(() => shuffleNext(+k), 1500 + 600 * k); }); } store.shufOdo = S.odo; save(); } } catch(e){}
     { const g = myGear().join(); if (g && g !== store.gearSent){ store.gearSent = g; save(); try { await lbPush(true); } catch(e){} } } // share your gear on your profile as soon as a new device connects
@@ -6775,8 +6776,32 @@ document.fonts && document.fonts.ready.then(() => moveTabPill(view));
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { applyTheme(); draw(); });
 
 /* ---- What's new: shows once per update ---- */
-const WN_VER = '2026-10-proxy';
+const WN_VER = '2026-10-preheat';
+/* ---- limited edition lights: owners can share their device's light files so we can add that edition's colorway ---- */
+const ED_LIGHT_PATHS = () => [0,1,2,3].map(i => `/u/app/hc/${i}/colr`).concat(['/p/app/thc/colr', '/p/app/ltrn/colr'],
+  S.api === 2 ? [0,1,2,3].flatMap(i => [`/u/app/hc/${i}/phcl`, `/u/app/hc/${i}/accl`]) : [0,1,2,3,4,5].map(i => `/u/app/led/aa/${i}`).concat([0,1,2,3,4,5,6,7].flatMap(i => [`/u/app/led/ca/${i}`, `/u/app/led/oa/${i}`])));
+function edIsLimited(){ return !!S.edition && (LIMITED_ED.includes(S.edition) || (isProxy() && S.edition !== 'Onyx')); }
+async function edShareSend(){
+  const files = {};
+  for (const p of ED_LIGHT_PATHS()){
+    if (S.mode !== 'live') return false;
+    try { const r = await ble.readAll(p); if (r && r.length) files[p] = toHex(r).slice(0, 8000); } catch(e){}
+  }
+  if (!Object.keys(files).length) return false;
+  // anonymous: no account, serial or device id, just the light data (hash only stops duplicate rows)
+  const hash = toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(S.edition + JSON.stringify(files)))));
+  await sbJSON('/rest/v1/edition_lights', { method:'POST', headers:{ Prefer:'return=minimal,resolution=ignore-duplicates' }, body: JSON.stringify({ hash, edition:S.edition, series:S.series || (isProxy() ? 'toad' : 'peak'), fw:S.fw || null, api:S.api || null, files }) });
+  store.edShare = store.edShare || {}; store.edShare[S.edition] = { ok:true, at:Date.now() }; save();
+  return true;
+}
+function edShareAsk(force){
+  if (S.mode !== 'live' || !edIsLimited()) return;
+  const st = (store.edShare || {})[S.edition];
+  if (!force && st && st.ok && Date.now() - st.at < 7 * 864e5) return; // shared recently
+  edShareSend().then(ok => { if (force) toast(ok ? `${S.edition} lights shared` : 'Could not read the lights'); }).catch(e => { if (force) toast('Share failed: ' + (e.message || e)); });
+}
 const WN_ITEMS = [
+  ['Preheat light', 'Pick a color or any mood (yours or Puffco’s) to show while a profile heats up. Find it on each profile in Profiles.'],
   ['Proxy support', 'Emberline now works with the Puffco Proxy: temps, battery, sessions, hit timer, blinkers, colors, moods, zones, brightness and the lantern.'],
   ['Randomizer', 'Tap Shuffle at the top of Lights for a random color combo and effect. Keep the ones you like.'],
   ['Gear on profiles', 'Profiles now show which Puffcos people use.']
