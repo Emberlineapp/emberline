@@ -3774,31 +3774,9 @@ function drawCelDev(){
   el.hidden = false;
   el.innerHTML = `<span class="label">Dev · preview animations</span>
     <p class="muted" style="margin:0;font-size:13px">Only you see this. Nothing here changes your points.</p>
-    <div class="row"><button class="btn small" data-cel="pop">Session pop</button>${RANK_TIERS.slice(1).map((t, i) => `<button class="btn small" data-cel="${i + 1}">${RANK_TIERS[i].n} → ${t.n}</button>`).join('')}<button class="btn small" data-cel="aurum">Aurum unlock</button></div>
-    <span class="label" style="margin-top:6px">Dev · edition moods</span>
-    <p class="muted" style="margin:0;font-size:13px">Captured files. Plasma is Peak Pro only, Haze is Proxy only. Set puts it on the active profile.</p>
-    ${DEV_MOODS.map((m, i) => `<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><i class="mood-sw" style="width:28px;height:28px;border-radius:8px;background:linear-gradient(90deg,${m.cols.join(',')})"></i><b style="flex:1;min-width:120px">${m.name} <span class="muted" style="font-weight:400;font-size:12px">${m.dev}</span></b><button class="btn small" data-devm="pv:${i}">Preview</button><button class="btn small primary" data-devm="set:${i}">Set</button></div>`).join('')}`;
+    <div class="row"><button class="btn small" data-cel="pop">Session pop</button>${RANK_TIERS.slice(1).map((t, i) => `<button class="btn small" data-cel="${i + 1}">${RANK_TIERS[i].n} → ${t.n}</button>`).join('')}<button class="btn small" data-cel="aurum">Aurum unlock</button></div>`;
 }
-const DEV_MOODS = [
-  { name:'Plasma', dev:'Peak Pro', proxy:false, cols:['#9900ff','#c800ff','#fe9700','#ff7300'], hex:'a2646c616d70a2646e616d656870696b616c65643265706172616dab64616e696d0565636f6c6f7258609900ffa100feb200fec100ffc800ffc000feac00fe9700fe8c00ff9718fdae30fcc441fece47ffc641feb431fda118fe9900ff9400ff8700fe7a00ff7300ff7300ff7300ff7300ff7300ff7300ff7300ff7300ff7300ff7a00ff8700fe9400ff65706c4e756d00657370656564046662726967687418ff6664694672616300666f6666736574941a08000e381a10001c701a18002aa81a080038e01a100047181a180055501a100063881a200071c01a18007ff81a10008e301a18009c681a1000aaa01a1800b8d81a2000c7101a2000d5481a0800e3800000000067706c44656e6f6d0068636f6c6f724c656e00687370656564446930fb3fe99999a000000068737065656444693108646d657461a46776657273696f6e03686d6f6f64556c696450000050e2a5cd710548336e2419ce9dd56f6865617450726f66696c65556c696450019e4d3515fd140aa68c7e2a45ed4f15776865617450726f66696c65446174654d6f6469666965641a6a9f1c94' },
-  { name:'Haze', dev:'Proxy', proxy:true, cols:['#8b51e1','#a8f9ff','#ddcefb','#c578ea'], hex:'a200a2000001ab0018ff01190410020103000400058c1a380020001a380030001a380040001a380050001a380000001a380010001a380020001a380030001a380040001a380050001a380000001a3800100006528b51e197aaeda8f9ffddcefbff9ef7c578ea07060818d0091908200a0001a40050000050e2a5cde8792026151a5ad546a70103065001a05a0139210e860117d5a08215fb71071a6ab36441' }
-];
-document.addEventListener('click', async e => {
-  const b = e.target.closest('[data-devm]'); if (!b) return;
-  const [act, n] = b.dataset.devm.split(':'), m = DEV_MOODS[+n];
-  if (S.mode !== 'live'){ toast('Connect first'); return; }
-  if (m.proxy !== isProxy() || S.api === 2){ toast(`${m.name} only works on a ${m.dev}`); return; }
-  const blob = new Uint8Array(m.hex.match(/../g).map(x => parseInt(x, 16))); if (isProxy()) blob.native = true;
-  try {
-    if (act === 'pv'){ clearTimeout(previewTimer); await ledJob(() => previewWrite(blob)); previewTimer = setTimeout(() => ledJob(previewClear), 8000); toast(`${m.name} for 8 seconds`); return; }
-    const i = S.active;
-    await ledJob(async () => {
-      if (isProxy()){ await proxyColr(`/u/app/hc/${i}/colr`, blob); try { await proxyColr('/p/app/thc/colr', blob); } catch(_){} }
-      else { await ble.writeBlob(`/u/app/hc/${i}/colr`, blob); try { await ble.writeBlob('/p/app/thc/colr', blob); } catch(_){} }
-    });
-    toast(`${m.name} set on ${(S.profiles[i] || {}).name || 'P' + (i + 1)}`);
-  } catch(err){ toast('Failed: ' + (err.message || err)); }
-});
+
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-cel]'); if (!b) return;
   const k = b.dataset.cel;
@@ -5444,8 +5422,12 @@ let moodTarget = null; // 0..3 or 'lantern'
 function allMine(){
   return store.myMoods.concat(MOODS.mine.map(m => Object.assign({ fromAccount:true }, m)));
 }
+const edMood = ref => ref && ref.kind === 'ed' ? EDITION_MOODS.find(x => x.id === ref.id) || null : null;
+const edMoodsHere = () => { let u = ''; try { u = String((LB.me && LB.me.username) || lbStore().username || '').toLowerCase(); } catch(e){} return u === 'rich' && S.api !== 2 ? EDITION_MOODS.filter(x => x.proxy === isProxy()) : []; }; // rich only, matching device
+const EDITION_MOODS = [{"id":"ed-plasma","name":"Plasma","proxy":false,"speed":20,"colors":["#9900ff","#a100fe","#b200fe","#c100ff","#c800ff","#c000fe","#ac00fe","#9700fe","#8c00ff","#9718fd","#ae30fc","#c441fe","#ce47ff","#c641fe","#b431fd","#a118fe","#9900ff","#9400ff","#8700fe","#7a00ff","#7300ff","#7300ff","#7300ff","#7300ff","#7300ff","#7300ff","#7300ff","#7300ff","#7300ff","#7a00ff","#8700fe","#9400ff"],"blob":"a2646c616d70a2646e616d656870696b616c65643265706172616dab64616e696d0565636f6c6f7258609900ffa100feb200fec100ffc800ffc000feac00fe9700fe8c00ff9718fdae30fcc441fece47ffc641feb431fda118fe9900ff9400ff8700fe7a00ff7300ff7300ff7300ff7300ff7300ff7300ff7300ff7300ff7300ff7a00ff8700fe9400ff65706c4e756d00657370656564046662726967687418ff6664694672616300666f6666736574941a08000e381a10001c701a18002aa81a080038e01a100047181a180055501a100063881a200071c01a18007ff81a10008e301a18009c681a1000aaa01a1800b8d81a2000c7101a2000d5481a0800e3800000000067706c44656e6f6d0068636f6c6f724c656e00687370656564446930fb3fe99999a000000068737065656444693108646d657461a46776657273696f6e03686d6f6f64556c696450000050e2a5cd710548336e2419ce9dd56f6865617450726f66696c65556c696450019e4d3515fd140aa68c7e2a45ed4f15776865617450726f66696c65446174654d6f6469666965641a6a9f1c94"},{"id":"ed-haze","name":"Haze","proxy":true,"speed":30,"colors":["#8b51e1","#97aaed","#a8f9ff","#ddcefb","#ff9ef7","#c578ea"],"blob":"a200a2000001ab0018ff01190410020103000400058c1a380020001a380030001a380040001a380050001a380000001a380010001a380020001a380030001a380040001a380050001a380000001a3800100006528b51e197aaeda8f9ffddcefbff9ef7c578ea07060818d0091908200a0001a40050000050e2a5cde8792026151a5ad546a70103065001a05a0139210e860117d5a08215fb71071a6ab36441"}]; // captured edition moods (Plasma = Peak Pro file, Haze = Proxy file)
 function findMood(ref){
   if (!ref) return null;
+  if (ref.kind === 'ed') return edMood(ref) ? ref : null;
   if (ref.kind === 'excl') return MOODS.excl.find(x => x.id === ref.id) ? ref : null;
   return ref;
 }
@@ -5664,11 +5646,13 @@ function moodLamp(ref){
 }
 function moodColors(ref){
   if (ref.tag === ZONE_TAG) return zoneStillColors(ref.meta || zoneDefaults()).filter(c => c !== '#000000');
+  if (ref.kind === 'ed'){ const x = edMood(ref); return x ? x.colors : []; }
   if (ref.kind === 'excl'){ const x = MOODS.excl.find(e => e.id === ref.id); return x ? x.lamp.param.color : []; }
   const l = moodLamp(ref); const c = l ? MoodEngine.previewColors(l) : [];
   return c.length ? c : (ref.meta && ref.meta.userColors) || [];
 }
 function moodPayload(ref){
+  if (ref.kind === 'ed'){ const x = edMood(ref); if (!x || x.proxy !== isProxy() || S.api === 2) throw new Error('This mood is for a ' + (x && x.proxy ? 'Proxy' : 'Peak Pro')); const b = new Uint8Array(x.blob.match(/../g).map(v => parseInt(v, 16))); if (isProxy()) b.native = true; return b; }
   const lamp = moodLamp(ref); if (!lamp) throw new Error('Unknown mood');
   const meta = { version: 1, moodName: String(ref.name || 'Mood').slice(0, 24) };
   const m = ref.kind === 'excl' ? { userColors: (MOODS.excl.find(e => e.id === ref.id) || {}).colors } : (ref.meta || {});
@@ -5678,6 +5662,7 @@ function moodPayload(ref){
   return cbor({ lamp, meta });
 }
 function moodSpeed(ref){
+  if (ref.kind === 'ed') return (edMood(ref) || {}).speed || 40;
   try { const l = moodLamp(ref); const s = l.param.speed; return typeof s === 'number' ? s : 40; } catch(e){ return 40; }
 }
 function swatchStyle(ref){
@@ -5730,7 +5715,7 @@ async function applyMood(ref){
 }
 function moodTile(ref, idx, group){
   const on = LT.on && LT.pending ? sameMood(LT.pending, ref) : phIdx(moodTarget) >= 0 ? sameMood(phMood(phIdx(moodTarget)), ref) : moodTarget === 'lantern' ? store.lanternMood && sameMood(store.lanternMood, ref) : S.profiles[moodTarget ?? S.active].mood && sameMood(S.profiles[moodTarget ?? S.active].mood, ref);
-  const tplName = ref.kind === 'excl' ? 'Exclusive' : ref.tag === ZONE_TAG ? 'Zones' : (MOODS.tpl[ref.tag] || {}).name || '';
+  const tplName = ref.kind === 'ed' || ref.kind === 'excl' ? 'Exclusive' : ref.tag === ZONE_TAG ? 'Zones' : (MOODS.tpl[ref.tag] || {}).name || '';
   return `<button class="mood" data-mg="${group}" data-mi="${idx}" aria-pressed="${!!on}"><i class="mood-sw" style="${swatchStyle(ref)}"></i>${group === 'm' ? '<span class="medit">Edit</span>' : ''}<b>${esc(ref.name)}</b><span>${esc(tplName)}</span></button>`;
 }
 function sameMood(a, b){ return a && b && a.kind === b.kind && (a.kind === 'excl' ? a.id === b.id : (a.id && a.id === b.id) || (a.tag === b.tag && JSON.stringify(a.meta) === JSON.stringify(b.meta))); }
@@ -5796,9 +5781,9 @@ function rndWire(){
 }
 /* ---- mood shuffle: a profile picks a random mood from your chosen saved moods after every session ---- */
 function shufCfg(i){ store.shuffle = store.shuffle || {}; return store.shuffle[i] || (store.shuffle[i] = { on:false, ids:[] }); }
-const moodKey = m => m.kind === 'excl' ? 'x:' + m.id : m.id || (m.tag + ':' + JSON.stringify(m.meta || {}));
+const moodKey = m => m.kind === 'excl' ? 'x:' + m.id : m.kind === 'ed' ? 'e:' + m.id : m.id || (m.tag + ':' + JSON.stringify(m.meta || {}));
 // everything a profile can shuffle through: your saved moods plus the Puffco exclusives
-function shufAll(){ return allMine().map(m => Object.assign({ kind:'tpl' }, m)).concat(MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }))); }
+function shufAll(){ return allMine().map(m => Object.assign({ kind:'tpl' }, m)).concat(edMoodsHere().map(x => ({ kind:'ed', id:x.id, name:x.name })), MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }))); }
 function shufPool(i){ const ids = shufCfg(i).ids; return shufAll().filter(m => ids.includes(moodKey(m))); }
 async function shuffleNext(i, why){
   const c = shufCfg(i); if (!c.on) return;
@@ -5823,7 +5808,7 @@ function shufSheet(i){
       <h2 style="margin:0;text-align:center">Moods in the mix</h2>
       <p style="margin:0;text-align:center;font-size:14px">Tap the moods ${esc((S.profiles[i] || {}).name || 'this profile')} can pick from. Your moods and Puffco exclusives both work.</p>
       <div class="row" style="gap:8px"><button class="btn small" data-sh="all" style="flex:1">Select all</button><button class="btn small" data-sh="none" style="flex:1">Clear</button></div>
-      <div class="shuf-list">${all.length ? all.map(m => { const k = moodKey(m), on = sel.has(k); return `<button class="shuf-item${on ? ' on' : ''}" data-shk="${esc(k)}" aria-pressed="${on}"><i class="mood-sw" style="${swatchStyle(m)}"></i><span><b>${esc(m.name || 'Mood')}</b><small>${esc(m.kind === 'excl' ? 'Puffco exclusive' : (MOODS.tpl[m.tag] || {}).name || (m.tag === ZONE_TAG ? 'Zones' : ''))}</small></span><em>${on ? '✓' : ''}</em></button>`; }).join('') : '<p class="muted" style="margin:0">No moods yet.</p>'}</div>
+      <div class="shuf-list">${all.length ? all.map(m => { const k = moodKey(m), on = sel.has(k); return `<button class="shuf-item${on ? ' on' : ''}" data-shk="${esc(k)}" aria-pressed="${on}"><i class="mood-sw" style="${swatchStyle(m)}"></i><span><b>${esc(m.name || 'Mood')}</b><small>${esc(m.kind === 'excl' || m.kind === 'ed' ? 'Puffco exclusive' : (MOODS.tpl[m.tag] || {}).name || (m.tag === ZONE_TAG ? 'Zones' : ''))}</small></span><em>${on ? '✓' : ''}</em></button>`; }).join('') : '<p class="muted" style="margin:0">No moods yet.</p>'}</div>
       <button class="btn primary" id="shDone" style="width:100%">${sel.size ? `Done · ${sel.size} mood${sel.size === 1 ? '' : 's'}` : 'Done'}</button></div>`;
     requestAnimationFrame(() => el.classList.add('on'));
   };
@@ -5846,7 +5831,7 @@ function drawMoods(){
   const excl = MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }));
   const mine = allMine().map(m => Object.assign({ kind:'tpl' }, m));
   box.innerHTML = shufCard() + rndCard() +
-    `<div class="sgroup"><div class="label">Puffco exclusives</div><div class="moods">${excl.map((r, i) => moodTile(r, i, 'x')).join('')}</div></div>` +
+    `<div class="sgroup"><div class="label">Puffco exclusives</div><div class="moods">${edMoodsHere().map((x, i) => moodTile({ kind:'ed', id:x.id, name:x.name }, i, 'e')).join('')}${excl.map((r, i) => moodTile(r, i, 'x')).join('')}</div></div>` +
     `<div class="sgroup"><div class="row between"><span class="label">Your moods</span><span class="row" style="gap:6px"><button class="btn small" id="bNewMood">New mood</button></span></div><div class="moods">${mine.map((r, i) => moodTile(r, i, 'm')).join('') || '<p class="muted">No saved moods yet.</p>'}</div></div>`;
   $('#bNewMood').onclick = () => openMoodEditor();
   rndWire();
@@ -5855,6 +5840,7 @@ function drawMoods(){
     if (pk) pk.onclick = () => shufSheet(t); }
 }
 function moodFromTile(g, i){
+  if (g === 'e'){ const x = edMoodsHere()[i]; return { kind:'ed', id:x.id, name:x.name }; }
   if (g === 'x'){ const x = MOODS.excl.filter(x => !isProxy() || x.toad)[i]; return { kind:'excl', id:x.id, name:x.name }; }
   return Object.assign({ kind:'tpl' }, allMine()[i]);
 }
