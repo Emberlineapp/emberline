@@ -5414,8 +5414,12 @@ let moodTarget = null; // 0..3 or 'lantern'
 function allMine(){
   return store.myMoods.concat(MOODS.mine.map(m => Object.assign({ fromAccount:true }, m)));
 }
+const edMood = ref => ref && ref.kind === 'ed' ? EDITION_MOODS.find(x => x.id === ref.id) || null : null;
+const edMoodsHere = () => { let u = ''; try { u = String((LB.me && LB.me.username) || lbStore().username || '').toLowerCase(); } catch(e){} return u === 'rich' && !isProxy() && S.api !== 2 ? EDITION_MOODS : []; }; // only rich, only Peak Pro
+const EDITION_MOODS = [{"id":"cap-plasmaA","from":"Plasma","name":"Plasma · Neon Flash","speed":40,"colors":["#ff0000","#00ff00","#ff35c3","#ffffff"],"blob":"a2646c616d70a2646e616d65676d696772746e3165706172616db66570617468739083820618cd8208181a820d181a82820d18e68206181a82820c18e68209181a83820918cd8208181a820c181a82820818e68209181a82820818e68206181a84820d1833820f18668207181a820e184d84820a1833820b184d820e184d820f184d81820718ff84820c1833820a18668207181a820b184d82820b18668220189a83820a1833820e18338220189a83820a1866820b1866820e183383820f1866820e1866820b183383820f1833820b18338220189a82820e18668220189a657369676d6103657370656564fb3ff35c290000000066636f6c6f72734cff000000ff00ff35c3ffffff6664694672616300666d617851747904666d696e51747902676e7574724465700067736f7572636573868200182b8201182b8202182b8203182b8204182b8205182b686267427269676874fb3fe5555560000000687369676d6144693004687369676d6144693102687370656564446930fb3fe35c2900000000687370656564446931fb400d0a3d800000006873756e6c69676874fb3fb99999a0000000696d61784c656e67746808696d696e4c656e6774680469737061776e46726571fb3fe00000000000006a70726552756e5469636bfb3fc52832c00000006b6267427269676874446930fb3fd55555600000006b6267427269676874446931016c70726552756e4e5469636b73181e646d657461aa6776657273696f6e13686d6f6f644e616d65684e6577204d6f6f64686d6f6f645479706509686d6f6f64556c696450019fb54cbb6fbcb94d9958a273e7d18b6974656d706f46726163fb3fe00000000000006a75736572436f6c6f72738467236666303030306723303066663030672366663335633367236666666666666f6865617450726f66696c65556c696450019fb59b14d9c6280c1157446a201efb706d6f6f64446174654d6f6469666965641a6a6bda4d706f726967696e616c4d6f6f64556c696450019fb54cbb6fbcb94d9958a273e7d18b776865617450726f66696c65446174654d6f6469666965641a6a79bec1"},{"id":"cap-plasmaB","from":"Plasma","name":"Plasma · Pink Wave","speed":110,"colors":["#ff00f5","#0000ff","#ffe8ec"],"blob":"a2646c616d70a2646e616d656870696b616c65643265706172616dab64616e696d0165636f6c6f72582dff00f5ef00f2c900ec9600eb5800f40000ff463fe47f73dcb9a8e3ead5eaffe8ecffd9edffb4f0fe82f1fe46f365706c4e756d00657370656564186e6662726967687418ff6664694672616300666f66667365749419b40019dbff191401193c001963ff198c0119b400197800197800193c00192154190d561909ff19e60119e2aa19ceac0000000067706c44656e6f6d0068636f6c6f724c656e0f687370656564446930fb403b80000000000068737065656444693118dc646d657461aa6776657273696f6e13686d6f6f644e616d65684e6577204d6f6f64686d6f6f645479706501686d6f6f64556c69645001a0d74158f9a0a24b0da12afb1d20076974656d706f46726163fb3fea8f5c200000006a75736572436f6c6f7273836723666630306635672330303030666667236666653865636f6865617450726f66696c65556c696450019fb3cc341fd649f216a36ac31ff77f706d6f6f64446174654d6f6469666965641a6ab614d3706f726967696e616c4d6f6f64556c69645001a0d74158f9a0a24b0da12afb1d2007776865617450726f66696c65446174654d6f6469666965641a6ab614eb"},{"id":"cap-plasmaC","from":"Plasma","name":"Plasma · Rainbow","speed":32,"colors":["#ff0000","#ff3000","#ff6000","#ff9000","#ffc000","#fff000","#e0ff00","#b0ff00","#80ff00","#50ff00","#20ff00","#00ff10","#00ff40","#00ff70","#00ffa0","#00ffd0","#00ffff","#00d0ff","#00a0ff","#0070ff","#0040ff","#0010ff","#2000ff","#5000ff","#8000ff","#b000ff","#e000ff","#ff00f0","#ff00c0","#ff0090","#ff0060","#ff0030"],"blob":"a2646c616d70a2646e616d656870696b616c65643265706172616dab64616e696d0165636f6c6f725860ff0000ff3000ff6000ff9000ffc000fff000e0ff00b0ff0080ff0050ff0020ff0000ff1000ff4000ff7000ffa000ffd000ffff00d0ff00a0ff0070ff0040ff0010ff2000ff5000ff8000ffb000ffe000ffff00f0ff00c0ff0090ff0060ff003065706c4e756d0065737065656418206662726967687418ff6664694672616300666f6666736574941a000180001a0001d555192aab19800019d5551a00012aab1a000180001a000100001a0001000019800019471c191c721a0001e38e1a0001b8e41a0001e38e1a0001b8e40000000067706c44656e6f6d0068636f6c6f724c656e1820687370656564446930fb40199999a00000006873706565644469311840646d657461a46776657273696f6e03686d6f6f64556c696450000050e2a5cd6c4efc9c55b0679bd9326f6865617450726f66696c65556c696450019fbb07f834dc1483f56f92e6a9a394776865617450726f66696c65446174654d6f6469666965641a6abf3cf7"},{"id":"cap-plasmaD","from":"Plasma","name":"Plasma · Sunset Pop","speed":20,"colors":["#ff7256","#b051ff","#ff6dee","#ff8877","#e807ff"],"blob":"a2646c616d70a2646e616d65676d696772746e3165706172616db66570617468739081820618ff81820d18ff81820c18ff81820918ff81820818ff81820818ff81820f18ff82820b187f820e187f81820718ff81820a18ff81822018ff81822018ff82820a187f820b187f82820f187f820e187f81822018ff81822018ff657369676d61036573706565641466636f6c6f72734fff7256b051ffff6deeff8877e807ff6664694672616301666d617851747910666d696e5174790c676e7574724465700067736f7572636573868200182b8201182b8202182b8203182b8204182b8205182b686267427269676874fb3fe0000000000000687369676d61446930fb400c000000000000687369676d61446931fb40040000000000006873706565644469300568737065656444693118286873756e6c69676874fb3fb99999a0000000696d61784c656e67746804696d696e4c656e6774680269737061776e46726571056a70726552756e5469636bfb3f847ae1400000006b6267427269676874446930fb3fd00000000000006b6267427269676874446931fb3fe80000000000006c70726552756e4e5469636b73181e646d657461aa6776657273696f6e13686d6f6f644e616d65684e6577204d6f6f64686d6f6f64547970650a686d6f6f64556c696450019feb6627474150ecedde74b25104916974656d706f46726163016a75736572436f6c6f727385672366663732353667236230353166666723666636646565672366663838373767236538303766666f6865617450726f66696c65556c696450019feb285dc38347992e5524f3a5cdb1706d6f6f64446174654d6f6469666965641a6a8278d1706f726967696e616c4d6f6f64556c696450019feb6627474150ecedde74b2510491776865617450726f66696c65446174654d6f6469666965641a6aa2222d"},{"id":"cap-daybreakE","from":"Daybreak","name":"Daybreak · Halloween 🎃","speed":40,"colors":["#8d00ff","#11ff50","#ff6428"],"blob":"a2646c616d70a2646e616d65676d696772746e3165706172616db66570617468739083820618cd8208181a820d181a82820d18e68206181a82820c18e68209181a83820918cd8208181a820c181a82820818e68209181a82820818e68206181a84820d1833820f18668207181a820e184d84820a1833820b184d820e184d820f184d81820718ff84820c1833820a18668207181a820b184d82820b18668220189a83820a1833820e18338220189a83820a1866820b1866820e183383820f1866820e1866820b183383820f1833820b18338220189a82820e18668220189a657369676d6103657370656564fb3fce7b80a000000066636f6c6f7273498d00ff11ff50ff64286664694672616301666d617851747908666d696e51747906676e7574724465700067736f7572636573868200182b8201182b8202182b8203182b8204182b8205182b686267427269676874fb3fe5555560000000687369676d6144693004687369676d6144693102687370656564446930fb3fbe7b80a0000000687370656564446931fb3fe6dca0800000006873756e6c69676874fb3fb99999a0000000696d61784c656e67746808696d696e4c656e6774680469737061776e46726571fb3fe00000000000006a70726552756e5469636bfb3feadfdf000000006b6267427269676874446930fb3fd55555600000006b6267427269676874446931016c70726552756e4e5469636b73181e646d657461aa6776657273696f6e13686d6f6f644e616d656e48616c6c6f7765656e20f09f8e83686d6f6f645479706509686d6f6f64556c69645001a1006de3ea22eb8f7513e6b0b75d436974656d706f46726163fb3fc47ae1400000006a75736572436f6c6f7273836723386430306666672331316666353067236666363432386f6865617450726f66696c65556c696450019d2c97540d190dee9b688a25ea7754706d6f6f64446174654d6f6469666965641a6ac09f61706f726967696e616c4d6f6f64556c69645001a1006de3ea22eb8f7513e6b0b75d43776865617450726f66696c65446174654d6f6469666965641a6ac0ec78"}]; // captured from limited edition owners (Peak Pro format)
 function findMood(ref){
   if (!ref) return null;
+  if (ref.kind === 'ed') return edMood(ref) ? ref : null;
   if (ref.kind === 'excl') return MOODS.excl.find(x => x.id === ref.id) ? ref : null;
   return ref;
 }
@@ -5634,11 +5638,13 @@ function moodLamp(ref){
 }
 function moodColors(ref){
   if (ref.tag === ZONE_TAG) return zoneStillColors(ref.meta || zoneDefaults()).filter(c => c !== '#000000');
+  if (ref.kind === 'ed'){ const x = edMood(ref); return x ? x.colors : []; }
   if (ref.kind === 'excl'){ const x = MOODS.excl.find(e => e.id === ref.id); return x ? x.lamp.param.color : []; }
   const l = moodLamp(ref); const c = l ? MoodEngine.previewColors(l) : [];
   return c.length ? c : (ref.meta && ref.meta.userColors) || [];
 }
 function moodPayload(ref){
+  if (ref.kind === 'ed'){ const x = edMood(ref); if (!x || isProxy()) throw new Error('Mood not available here'); return new Uint8Array(x.blob.match(/../g).map(b => parseInt(b, 16))); }
   const lamp = moodLamp(ref); if (!lamp) throw new Error('Unknown mood');
   const meta = { version: 1, moodName: String(ref.name || 'Mood').slice(0, 24) };
   const m = ref.kind === 'excl' ? { userColors: (MOODS.excl.find(e => e.id === ref.id) || {}).colors } : (ref.meta || {});
@@ -5648,6 +5654,7 @@ function moodPayload(ref){
   return cbor({ lamp, meta });
 }
 function moodSpeed(ref){
+  if (ref.kind === 'ed') return (edMood(ref) || {}).speed || 40;
   try { const l = moodLamp(ref); const s = l.param.speed; return typeof s === 'number' ? s : 40; } catch(e){ return 40; }
 }
 function swatchStyle(ref){
@@ -5700,7 +5707,7 @@ async function applyMood(ref){
 }
 function moodTile(ref, idx, group){
   const on = LT.on && LT.pending ? sameMood(LT.pending, ref) : phIdx(moodTarget) >= 0 ? sameMood(phMood(phIdx(moodTarget)), ref) : moodTarget === 'lantern' ? store.lanternMood && sameMood(store.lanternMood, ref) : S.profiles[moodTarget ?? S.active].mood && sameMood(S.profiles[moodTarget ?? S.active].mood, ref);
-  const tplName = ref.kind === 'excl' ? 'Exclusive' : ref.tag === ZONE_TAG ? 'Zones' : (MOODS.tpl[ref.tag] || {}).name || '';
+  const tplName = ref.kind === 'ed' ? ((edMood(ref) || {}).from || 'Captured') : ref.kind === 'excl' ? 'Exclusive' : ref.tag === ZONE_TAG ? 'Zones' : (MOODS.tpl[ref.tag] || {}).name || '';
   return `<button class="mood" data-mg="${group}" data-mi="${idx}" aria-pressed="${!!on}"><i class="mood-sw" style="${swatchStyle(ref)}"></i>${group === 'm' ? '<span class="medit">Edit</span>' : ''}<b>${esc(ref.name)}</b><span>${esc(tplName)}</span></button>`;
 }
 function sameMood(a, b){ return a && b && a.kind === b.kind && (a.kind === 'excl' ? a.id === b.id : (a.id && a.id === b.id) || (a.tag === b.tag && JSON.stringify(a.meta) === JSON.stringify(b.meta))); }
@@ -5766,9 +5773,9 @@ function rndWire(){
 }
 /* ---- mood shuffle: a profile picks a random mood from your chosen saved moods after every session ---- */
 function shufCfg(i){ store.shuffle = store.shuffle || {}; return store.shuffle[i] || (store.shuffle[i] = { on:false, ids:[] }); }
-const moodKey = m => m.kind === 'excl' ? 'x:' + m.id : m.id || (m.tag + ':' + JSON.stringify(m.meta || {}));
+const moodKey = m => m.kind === 'excl' ? 'x:' + m.id : m.kind === 'ed' ? 'e:' + m.id : m.id || (m.tag + ':' + JSON.stringify(m.meta || {}));
 // everything a profile can shuffle through: your saved moods plus the Puffco exclusives
-function shufAll(){ return allMine().map(m => Object.assign({ kind:'tpl' }, m)).concat(MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }))); }
+function shufAll(){ return allMine().map(m => Object.assign({ kind:'tpl' }, m)).concat(edMoodsHere().map(x => ({ kind:'ed', id:x.id, name:x.name })), MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }))); }
 function shufPool(i){ const ids = shufCfg(i).ids; return shufAll().filter(m => ids.includes(moodKey(m))); }
 async function shuffleNext(i, why){
   const c = shufCfg(i); if (!c.on) return;
@@ -5793,7 +5800,7 @@ function shufSheet(i){
       <h2 style="margin:0;text-align:center">Moods in the mix</h2>
       <p style="margin:0;text-align:center;font-size:14px">Tap the moods ${esc((S.profiles[i] || {}).name || 'this profile')} can pick from. Your moods and Puffco exclusives both work.</p>
       <div class="row" style="gap:8px"><button class="btn small" data-sh="all" style="flex:1">Select all</button><button class="btn small" data-sh="none" style="flex:1">Clear</button></div>
-      <div class="shuf-list">${all.length ? all.map(m => { const k = moodKey(m), on = sel.has(k); return `<button class="shuf-item${on ? ' on' : ''}" data-shk="${esc(k)}" aria-pressed="${on}"><i class="mood-sw" style="${swatchStyle(m)}"></i><span><b>${esc(m.name || 'Mood')}</b><small>${esc(m.kind === 'excl' ? 'Puffco exclusive' : (MOODS.tpl[m.tag] || {}).name || (m.tag === ZONE_TAG ? 'Zones' : ''))}</small></span><em>${on ? '✓' : ''}</em></button>`; }).join('') : '<p class="muted" style="margin:0">No moods yet.</p>'}</div>
+      <div class="shuf-list">${all.length ? all.map(m => { const k = moodKey(m), on = sel.has(k); return `<button class="shuf-item${on ? ' on' : ''}" data-shk="${esc(k)}" aria-pressed="${on}"><i class="mood-sw" style="${swatchStyle(m)}"></i><span><b>${esc(m.name || 'Mood')}</b><small>${esc(m.kind === 'ed' ? 'Captured' : m.kind === 'excl' ? 'Puffco exclusive' : (MOODS.tpl[m.tag] || {}).name || (m.tag === ZONE_TAG ? 'Zones' : ''))}</small></span><em>${on ? '✓' : ''}</em></button>`; }).join('') : '<p class="muted" style="margin:0">No moods yet.</p>'}</div>
       <button class="btn primary" id="shDone" style="width:100%">${sel.size ? `Done · ${sel.size} mood${sel.size === 1 ? '' : 's'}` : 'Done'}</button></div>`;
     requestAnimationFrame(() => el.classList.add('on'));
   };
@@ -5815,7 +5822,8 @@ function drawMoods(){
   $('#moodTarget').innerHTML = S.profiles.map((p, i) => `<button data-mt="${i}" aria-pressed="${tgt === i}">${esc(p.name.slice(0, 7))}</button>`).join('') + `<button data-mt="lantern" aria-pressed="${tgt === 'lantern'}">Lantern</button>`;
   const excl = MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }));
   const mine = allMine().map(m => Object.assign({ kind:'tpl' }, m));
-  box.innerHTML = shufCard() + rndCard() +
+  const edm = edMoodsHere().map(x => ({ kind:'ed', id:x.id, name:x.name }));
+  box.innerHTML = shufCard() + rndCard() + (edm.length ? `<div class="sgroup"><div class="label">Captured edition moods</div><div class="moods">${edm.map((r, i) => moodTile(r, i, 'e')).join('')}</div></div>` : '') +
     `<div class="sgroup"><div class="label">Puffco exclusives</div><div class="moods">${excl.map((r, i) => moodTile(r, i, 'x')).join('')}</div></div>` +
     `<div class="sgroup"><div class="row between"><span class="label">Your moods</span><span class="row" style="gap:6px"><button class="btn small" id="bNewMood">New mood</button></span></div><div class="moods">${mine.map((r, i) => moodTile(r, i, 'm')).join('') || '<p class="muted">No saved moods yet.</p>'}</div></div>`;
   $('#bNewMood').onclick = () => openMoodEditor();
@@ -5825,6 +5833,7 @@ function drawMoods(){
     if (pk) pk.onclick = () => shufSheet(t); }
 }
 function moodFromTile(g, i){
+  if (g === 'e'){ const x = edMoodsHere()[i]; return { kind:'ed', id:x.id, name:x.name }; }
   if (g === 'x'){ const x = MOODS.excl.filter(x => !isProxy() || x.toad)[i]; return { kind:'excl', id:x.id, name:x.name }; }
   return Object.assign({ kind:'tpl' }, allMine()[i]);
 }
