@@ -41,6 +41,10 @@
 .shuf-item b{display:block;font-size:15px}.shuf-item small{color:var(--muted,#a1a1a6);font-size:12px}
 .shuf-item em{font-style:normal;font-weight:800;color:var(--accent);text-align:center}
 .shuf-item.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.lb-more{width:100%;display:flex;align-items:center;justify-content:center;gap:6px}
+.lb-more svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s}
+.lb-more[aria-expanded="true"] svg{transform:rotate(180deg)}
+.lb-you{border-top:1px dashed var(--line,rgba(255,255,255,.12));padding-top:8px}
 </style></head><body>
 <div class="spl" id="spl" aria-label="Loading Emberline" role="status">
   <div class="spl-in">
@@ -4717,6 +4721,10 @@ document.addEventListener('click', e => {
   if (e.target.closest('#socEdit') || e.target.closest('#socCreate')){ LB.edit = true; LB.err = ''; drawLeaderboard(); setTimeout(() => { const c = $('#lbCard'); if (c) c.scrollIntoView({ behavior:'smooth', block:'start' }); }, 60); }
 });
 function lbRowHtml(r, i, meId){ return `<div class="lb-row${r.id === meId ? ' me' : ''}" data-lbi="${i}" role="button" tabindex="0"><span class="lb-pos">${i + 1}</span>${lbAvatar(r.avatar_url, r.username, 36)}<span class="lb-name">${esc(r.username)}${r.dev ? devBadge(22) : ''}<small style="color:${lbTierColor(r.tier)}">${esc(r.tier)}</small>${(r.showcase || []).length ? `<span class="lb-show">${r.showcase.map(k => showBadge(k, undefined, r)).join('')}</span>` : ''}</span><span class="lb-medal">${rankBadge(new Date().getMonth(), rbTierIdx(r.tier), 34)}</span><b>${r.rp}<small> RP</small></b></div>`; }
+// leaderboard shows the top 5 (plus you) until you open the rest
+const LB_SHOW = 5;
+function lbMoreBtn(n){ if (n <= LB_SHOW) return ''; return `<button class="btn lb-more" data-lbmore aria-expanded="${!!LB.expand}">${LB.expand ? 'Show less' : `Show all ${n}`}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>`; }
+document.addEventListener('click', e => { if (!e.target.closest('[data-lbmore]')) return; LB.expand = !LB.expand; drawLeaderboard(); if (!LB.expand){ const c = $('#lbCard'); if (c) c.scrollIntoView({ behavior:'smooth', block:'start' }); } });
 function drawLeaderboard(){
   const el = $('#lbCard'); if (!el) return;
   const L = lbStore(), puff = lbUsesPuffco(), joined = L.joined && puff && !LB.edit;
@@ -4724,7 +4732,7 @@ function drawLeaderboard(){
     const rows = LB.rows || [];
     el.innerHTML = `<div class="row between"><span class="label">Leaderboard · ${new Date().toLocaleDateString([], { month:'long' })}</span></div>
       <div class="banner" style="padding:12px 14px"><div class="grow"><b>Ranked uses your Puffco login</b>Sign in with your Puffco account to join, pick a username and add a photo.</div><button class="btn small primary" id="lbGoSign">Sign in</button></div>
-      ${rows.length ? `<div class="lb-list">${rows.slice(0, 25).map((r, i) => lbRowHtml(r, i, null)).join('')}</div>` : (LB.rows == null ? '<p class="muted" style="margin:0">Loading…</p>' : '<p class="muted" style="margin:0">Nobody is ranked yet this month.</p>')}`;
+      ${rows.length ? `<div class="lb-list">${rows.slice(0, LB.expand ? 100 : LB_SHOW).map((r, i) => lbRowHtml(r, i, null)).join('')}</div>${lbMoreBtn(rows.length)}` : (LB.rows == null ? '<p class="muted" style="margin:0">Loading…</p>' : '<p class="muted" style="margin:0">Nobody is ranked yet this month.</p>')}`;
     return;
   }
   if (!joined){
@@ -4748,8 +4756,9 @@ function drawLeaderboard(){
   const row = (r, i) => lbRowHtml(r, i, meId);
   el.innerHTML = `<div class="row between"><span class="label">Leaderboard · ${new Date().toLocaleDateString([], { month:'long' })}</span><button class="btn small ghost" id="lbEdit">Edit profile</button></div>
     ${LB.err ? `<p class="acct-err">${esc(LB.err)}</p>` : ''}
-    ${LB.rows == null ? '<p class="muted" style="margin:0">Loading…</p>' : rows.length ? `<div class="lb-list">${rows.slice(0, 25).map(row).join('')}</div>` : '<p class="muted" style="margin:0">Nobody has points yet this month. Take a dab to get on the board.</p>'}
-    ${mine >= 25 ? `<div class="lb-list">${row(rows[mine], mine)}</div>` : ''}
+    ${LB.rows == null ? '<p class="muted" style="margin:0">Loading…</p>' : rows.length ? `<div class="lb-list">${rows.slice(0, LB.expand ? 100 : LB_SHOW).map(row).join('')}</div>` : '<p class="muted" style="margin:0">Nobody has points yet this month. Take a dab to get on the board.</p>'}
+    ${mine >= (LB.expand ? 100 : LB_SHOW) ? `<div class="lb-list lb-you">${row(rows[mine], mine)}</div>` : ''}
+    ${lbMoreBtn(rows.length)}
     <p class="muted" style="margin:0;font-size:12px">Updates live. Resets on the 1st.</p>
     ${acct() && acct().email ? `<p class="muted lb-linked">@${esc((LB.me && LB.me.username) || L.username || '')} is linked to ${esc(acct().email)}</p>` : ''}`;
 }
