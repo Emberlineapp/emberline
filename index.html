@@ -34,6 +34,13 @@
 .gear-chip.ed small{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:99px;background:rgba(0,0,0,.25);margin-left:2px}
 .gear-chip.ed.light small{background:rgba(0,0,0,.12)}
 .ed-card{border-color:color-mix(in srgb,var(--e1) 75%,transparent)!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--e1) 55%,transparent),0 12px 44px color-mix(in srgb,var(--e1) 30%,transparent)!important;background-image:linear-gradient(165deg,color-mix(in srgb,var(--e1) 48%,transparent),color-mix(in srgb,var(--e2) 18%,transparent) 42%,transparent 72%)!important;border-width:1.5px!important}
+.shuf-card{display:grid;gap:10px}
+.shuf-list{display:grid;gap:8px;overflow:auto;max-height:52vh;padding:2px}
+.shuf-item{display:grid;grid-template-columns:54px 1fr 22px;align-items:center;gap:12px;padding:8px 12px 8px 8px;border-radius:16px;border:1.5px solid transparent;background:var(--fill,rgba(255,255,255,.06));color:inherit;font:inherit;text-align:left}
+.shuf-item .mood-sw{display:block;width:54px;height:36px;border-radius:10px}
+.shuf-item b{display:block;font-size:15px}.shuf-item small{color:var(--muted,#a1a1a6);font-size:12px}
+.shuf-item em{font-style:normal;font-weight:800;color:var(--accent);text-align:center}
+.shuf-item.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 </style></head><body>
 <div class="spl" id="spl" aria-label="Loading Emberline" role="status">
   <div class="spl-in">
@@ -3074,6 +3081,7 @@ function trackSession(prev, st){
       store.lastEndF = Math.round(tF);
       if (cur.hit && (ranFor >= 20 || gotHit) && warm) setTimeout(() => toast(`Not counted for ranked. Let your ${devWord()} cool down a bit before the next session.`), 1500);
       if (cur.hit && (ranFor >= 20 || gotHit)){ logSession({ warm: warm || undefined, startF: cur.startF, t:cur.t, p:cur.p, name:cur.name, target:cur.target, peak:Math.round(cur.peak), dur:Math.round((Date.now()-cur.t)/1000), batt:cur.batt, hits:(cur.hits || HIT.hits).slice(0, 20), vapor:(S.profiles[cur.p] || {}).vapor, sc:sinceClean() + 1, run: cur.readyAt ? Math.round((Date.now() - cur.readyAt) / 1000) : null }); }
+      { const pi = cur.p; if (store.shuffle && store.shuffle[pi] && store.shuffle[pi].on) setTimeout(() => shuffleNext(pi), 2500); } // mood shuffle: next mood for this profile
       cur = null;
     }
   }
@@ -5695,6 +5703,50 @@ function rndWire(){
   const st = $('#rndSet'); if (st) st.onclick = async () => { try { await writeMoodTo(moodTarget ?? S.active, RND.cur); } catch(e){ toast('Could not set it: ' + (e.message || e)); } drawMoods(); };
   const sv = $('#rndSave'); if (sv) sv.onclick = () => { const m = { id: 'local-' + Date.now(), name: RND.cur.name, tag: RND.cur.tag, meta: JSON.parse(JSON.stringify(RND.cur.meta)) }; store.myMoods.unshift(m); save(); toast(`Saved "${m.name}" to your moods`); drawMoods(); };
 }
+/* ---- mood shuffle: a profile picks a random mood from your chosen saved moods after every session ---- */
+function shufCfg(i){ store.shuffle = store.shuffle || {}; return store.shuffle[i] || (store.shuffle[i] = { on:false, ids:[] }); }
+const moodKey = m => m.kind === 'excl' ? 'x:' + m.id : m.id || (m.tag + ':' + JSON.stringify(m.meta || {}));
+// everything a profile can shuffle through: your saved moods plus the Puffco exclusives
+function shufAll(){ return allMine().map(m => Object.assign({ kind:'tpl' }, m)).concat(MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }))); }
+function shufPool(i){ const ids = shufCfg(i).ids; return shufAll().filter(m => ids.includes(moodKey(m))); }
+async function shuffleNext(i, why){
+  const c = shufCfg(i); if (!c.on) return;
+  const pool = shufPool(i); if (!pool.length) return;
+  const curM = S.profiles[i] && S.profiles[i].mood, options = pool.length > 1 ? pool.filter(m => !(curM && sameMood(curM, m))) : pool;
+  const pick = options[Math.floor(Math.random() * options.length)];
+  try { await writeMoodTo(i, pick); } catch(e){ return; }
+  toast(`${why || 'Shuffle'}: ${pick.name || 'Mood'} is up next on ${(S.profiles[i] || {}).name || 'P' + (i + 1)}`);
+}
+function shufCard(){
+  const t = moodTarget ?? S.active; if (typeof t !== 'number') return '';
+  const c = shufCfg(t), n = shufPool(t).length, name = (S.profiles[t] || {}).name || 'P' + (t + 1);
+  return `<div class="sgroup shuf-card"><div class="row between"><span class="label">Mood shuffle</span><span class="muted" style="font-size:12px">${esc(name)}</span></div>
+    <label class="toggle"><span><b>Pick a random mood each session</b><br><span class="muted" style="font-size:13px">${c.on ? (n ? `Shuffling ${n} mood${n === 1 ? '' : 's'}. A new one is picked after every session.` : 'Choose at least 2 moods to shuffle.') : 'Off. This profile keeps the mood you set.'}</span></span><input type="checkbox" class="switch" id="shufOn" ${c.on ? 'checked' : ''}></label>
+    <button class="btn" id="shufPick" style="width:100%">${n ? `Edit moods in the mix (${n})` : 'Choose moods'}</button></div>`;
+}
+function shufSheet(i){
+  const all = shufAll(), c = shufCfg(i), sel = new Set(c.ids);
+  const el = document.createElement('div'); el.className = 'egg';
+  const paint = () => {
+    el.innerHTML = `<div class="egg-card" style="text-align:left;justify-items:stretch;gap:12px;max-height:86vh;width:min(100%,420px)">
+      <h2 style="margin:0;text-align:center">Moods in the mix</h2>
+      <p style="margin:0;text-align:center;font-size:14px">Tap the moods ${esc((S.profiles[i] || {}).name || 'this profile')} can pick from. Your moods and Puffco exclusives both work.</p>
+      <div class="row" style="gap:8px"><button class="btn small" data-sh="all" style="flex:1">Select all</button><button class="btn small" data-sh="none" style="flex:1">Clear</button></div>
+      <div class="shuf-list">${all.length ? all.map(m => { const k = moodKey(m), on = sel.has(k); return `<button class="shuf-item${on ? ' on' : ''}" data-shk="${esc(k)}" aria-pressed="${on}"><i class="mood-sw" style="${swatchStyle(m)}"></i><span><b>${esc(m.name || 'Mood')}</b><small>${esc(m.kind === 'excl' ? 'Puffco exclusive' : (MOODS.tpl[m.tag] || {}).name || (m.tag === ZONE_TAG ? 'Zones' : ''))}</small></span><em>${on ? '✓' : ''}</em></button>`; }).join('') : '<p class="muted" style="margin:0">No moods yet.</p>'}</div>
+      <button class="btn primary" id="shDone" style="width:100%">${sel.size ? `Done · ${sel.size} mood${sel.size === 1 ? '' : 's'}` : 'Done'}</button></div>`;
+    requestAnimationFrame(() => el.classList.add('on'));
+  };
+  paint(); document.body.appendChild(el);
+  el.addEventListener('click', e => {
+    const it = e.target.closest('[data-shk]'), a = e.target.closest('[data-sh]');
+    if (it){ const k = it.dataset.shk; sel.has(k) ? sel.delete(k) : sel.add(k); const y = el.querySelector('.shuf-list').scrollTop; paint(); el.querySelector('.shuf-list').scrollTop = y; return; }
+    if (a){ if (a.dataset.sh === 'all') all.forEach(m => sel.add(moodKey(m))); else sel.clear(); paint(); return; }
+    if (e.target.id === 'shDone'){
+      c.ids = [...sel]; if (c.ids.length) c.on = true; save(); el.classList.remove('on'); setTimeout(() => el.remove(), 260); drawMoods();
+      if (c.on && c.ids.length) shuffleNext(i, 'Shuffle on');
+    }
+  });
+}
 function drawMoods(){
   { const el = $('#moodFor'); if (el){ const t = moodTarget ?? S.active, n = t === 'lantern' ? 'the lantern' : ((S.profiles[t] || {}).name || 'P' + (t + 1)); el.textContent = `Tap a mood to set it on ${n}`; } }
   const box = $('#moodLib'); if (!box) return;
@@ -5702,11 +5754,14 @@ function drawMoods(){
   $('#moodTarget').innerHTML = S.profiles.map((p, i) => `<button data-mt="${i}" aria-pressed="${tgt === i}">${esc(p.name.slice(0, 7))}</button>`).join('') + `<button data-mt="lantern" aria-pressed="${tgt === 'lantern'}">Lantern</button>`;
   const excl = MOODS.excl.filter(x => !isProxy() || x.toad).map(x => ({ kind:'excl', id:x.id, name:x.name }));
   const mine = allMine().map(m => Object.assign({ kind:'tpl' }, m));
-  box.innerHTML = rndCard() +
+  box.innerHTML = shufCard() + rndCard() +
     `<div class="sgroup"><div class="label">Puffco exclusives</div><div class="moods">${excl.map((r, i) => moodTile(r, i, 'x')).join('')}</div></div>` +
     `<div class="sgroup"><div class="row between"><span class="label">Your moods</span><span class="row" style="gap:6px"><button class="btn small" id="bNewMood">New mood</button></span></div><div class="moods">${mine.map((r, i) => moodTile(r, i, 'm')).join('') || '<p class="muted">No saved moods yet.</p>'}</div></div>`;
   $('#bNewMood').onclick = () => openMoodEditor();
   rndWire();
+  { const t = moodTarget ?? S.active, on = $('#shufOn'), pk = $('#shufPick');
+    if (on) on.onchange = e => { const c = shufCfg(t); c.on = e.target.checked; save(); if (c.on && shufPool(t).length < 1) shufSheet(t); else if (c.on) shuffleNext(t, 'Shuffle on'); drawMoods(); };
+    if (pk) pk.onclick = () => shufSheet(t); }
 }
 function moodFromTile(g, i){
   if (g === 'x'){ const x = MOODS.excl.filter(x => !isProxy() || x.toad)[i]; return { kind:'excl', id:x.id, name:x.name }; }
