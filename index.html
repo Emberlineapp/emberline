@@ -45,6 +45,7 @@
 .lb-more svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s}
 .lb-more[aria-expanded="true"] svg{transform:rotate(180deg)}
 .lb-you{border-top:1px dashed var(--line,rgba(255,255,255,.12));padding-top:8px}
+.ph-note{display:block;font-size:12px;color:var(--muted);margin-top:2px}.ph-row{gap:10px}.ph-row .colorbtn{flex:none}
 </style></head><body>
 <div class="spl" id="spl" aria-label="Loading Emberline" role="status">
   <div class="spl-in">
@@ -3064,11 +3065,40 @@ async function poll(){
   } finally { busy = false; render(); }
 }
 
+document.addEventListener('input', e => { const t = e.target.closest && e.target.closest('[data-ph]'); if (t) t.parentElement.style.cssText = 'background:' + t.value; });
+document.addEventListener('change', e => { const t = e.target.closest && e.target.closest('[data-ph]'); if (!t) return; const i = +t.dataset.ph; phSet(i, t.value); drawProfiles(); toast(`Preheat color set for ${S.profiles[i].name}`); });
+/* preheat color: shows a different light while heating, then puts the profile light back */
+const phVal = i => ((store.preheat || [])[i]) || null;
+const phColor = i => { const v = phVal(i); return typeof v === 'string' ? v : null; };
+const phMood = i => { const v = phVal(i); return v && typeof v === 'object' ? v : null; };
+const phIdx = t => typeof t === 'string' && t.startsWith('ph:') ? +t.slice(3) : -1;
+function phLabel(i){ const m = phMood(i); return m ? `${esc(m.name || 'Mood')} while heating` : phColor(i) ? 'This color while heating' : 'Off, uses the profile light'; }
+function phSwatch(i){ const m = phMood(i), c = phColor(i); return m ? swatchStyle(m) : c ? 'background:' + c : 'background:transparent;border:2px dashed var(--muted)'; }
+function phHex(i){ const m = phMood(i); if (m){ try { return moodSolid(m); } catch(e){ return '#ffffff'; } } return phColor(i); }
+let phRestore = null;
+function phSet(i, hex){ store.preheat = store.preheat || []; store.preheat[i] = hex; save(); if (S.mode === 'live' && S.api === 2) ledJob(() => ble.write(`/u/app/hc/${i}/phcl`, rgbt(phHex(i) || S.profiles[i].color)).catch(() => {})); }
+function phStart(){
+  const v = phVal(S.active); if (!v || S.api === 2 || S.mode !== 'live' || phRestore) return; // original Peak does this on its own
+  ledJob(async () => {
+    try {
+      let saved = null;
+      try { const r = await ble.readAll('/p/app/thc/colr'); if (r && r.length > 8) saved = r; } catch(e){}
+      if (!saved){ try { const r = await ble.readAll(`/u/app/hc/${S.active}/colr`); if (r && r.length > 8) saved = r; } catch(e){} }
+      if (!saved) return; // can't put it back, so don't change it
+      const blob = typeof v === 'string' ? solidPayload(v) : moodPayload(v);
+      if (isProxy()) await proxyColr('/p/app/thc/colr', blob); else await ble.writeBlob('/p/app/thc/colr', blob);
+      phRestore = async () => { if (isProxy()) await proxyColr('/p/app/thc/colr', saved); else await ble.writeBlob('/p/app/thc/colr', saved); };
+    } catch(e){ phRestore = null; }
+  });
+}
+function phEnd(){ ledJob(async () => { const r = phRestore; phRestore = null; if (r && S.mode === 'live'){ try { await r(); } catch(e){} } }); }
+
 /* session tracking from state transitions */
 let cur = null;
 function trackSession(prev, st){
   checkWarn();
-  if (st === 7 && prev !== 7){ hitReset(); hitLoopStart(); } // start listening during preheat so hits count the moment it's Ready
+  if (st === 7 && prev !== 7){ hitReset(); hitLoopStart(); phStart(); }
+  if (prev === 7 && st !== 7) phEnd(); // start listening during preheat so hits count the moment it's Ready
   if (st === 8 && prev !== 8){ if (prev !== 9 && prev !== 7) hitReset(); hitLoopStart(); }
   if (prev === 8 && st !== 8 && S.mode === 'live' && !zoneLive.on){ clearTimeout(previewTimer); setTimeout(() => { ledJob(previewClear); if (LT.on) ltShowCurrent(); }, 900); }
   const tF = c2f(S.tempC);
@@ -3194,6 +3224,7 @@ async function saveProfile(i){
       else await writeProfileColor(i, p.color);
       p.lightDirty = false;
     }
+    if (S.api === 2){ try { await ble.write(`/u/app/hc/${i}/phcl`, rgbt(phHex(i) || p.color)); } catch(e){} }
     if (S.active === i) await ble.write('/p/app/hcs', new Uint8Array([i]));
     store.profSaved = store.profSaved || []; store.profSaved[i] = true; save();
     toast(`Saved "${p.name}" to your ${devWord()}`);
@@ -3705,6 +3736,7 @@ function drawProfilesInner(){
         <div class="field"><div class="row between"><span class="muted">Adds time</span><span class="val" id="pbtv${i}">+${p.boostT}s</span></div>
           <input type="range" id="pbt${i}" data-i="${i}" min="0" max="60" step="5" value="${p.boostT}"></div>
       </div>
+      <div class="row ph-row" style="margin:2px 0 10px"><span class="grow" style="min-width:0"><span class="muted">Preheat light</span><small class="ph-note">${phLabel(i)}</small></span>${phVal(i) ? `<button class="btn small ghost" data-phoff="${i}">Off</button>` : ''}<button class="btn small" data-phmood="${i}">Moods</button><span class="colorbtn" style="${phSwatch(i)}"><input type="color" data-ph="${i}" value="${phColor(i) || '#ff3b30'}" aria-label="Preheat color for ${esc(p.name)}"></span></div>
       <div class="row between"><span class="muted" style="font-size:13px">${i===S.active ? 'Active profile' : ''}</span><button class="btn small primary" data-save="${i}">Save to ${devWord()}</button></div>
     </div>`).join('');
 }
@@ -4926,6 +4958,7 @@ function show(v){
   clearTimeout(enterTimer); enterTimer = setTimeout(() => sec.classList.remove('enter','from-l'), 1900);
   document.querySelectorAll('#nav button').forEach(b => b.dataset.v === (v === 'lights' ? 'prof' : v) ? b.setAttribute('aria-current','page') : b.removeAttribute('aria-current'));
   if (v === 'prof'){ drawProfiles(); drawAccountProfiles(); drawLightsState(); }
+  if (v !== 'lights' && phIdx(moodTarget) >= 0) moodTarget = null; // preheat pick only lasts while on Lights
   if (v === 'lights'){ drawLights(); drawMoods(); ltEnter(); }
   if (v === 'set'){ drawSettings(); drawDevice(); drawAccount(); wireAcctForm('ac'); drawTestTools(); }
   if (v === 'shop'){ closeShopForm(); drawShops(); }
@@ -5060,6 +5093,8 @@ $('#profList').addEventListener('click', e => {
   if (q){ const i = +q.parentElement.dataset.qi; S.profiles[i].color = q.dataset.qc; S.profiles[i].mood = null; drawProfiles(); syncRanges(); return; }
   const cm = e.target.closest('[data-clrmood]'); if (cm){ S.profiles[+cm.dataset.clrmood].mood = null; drawProfiles(); syncRanges(); return; }
   const b = e.target.closest('[data-save]'); if (b) saveProfile(+b.dataset.save);
+  const pm = e.target.closest('[data-phmood]'); if (pm){ moodTarget = 'ph:' + pm.dataset.phmood; show('lights'); drawMoods(); return; }
+  const po = e.target.closest('[data-phoff]'); if (po){ phSet(+po.dataset.phoff, null); drawProfiles(); toast('Preheat color off'); }
 });
 
 $('#tLantern').onchange = e => setLantern(e.target.checked);
@@ -5476,7 +5511,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) zoneL
    Leaving Lights throws away anything unsaved and turns the preview off. */
 const LT = { on:false, pending:null, brDirty:false, brT:null };
 function ltTarget(){ return moodTarget ?? S.active; }
-function ltTargetName(){ const t = ltTarget(); return t === 'lantern' ? 'Lantern' : ((S.profiles[t] || {}).name || 'P' + (t + 1)); }
+function ltTargetName(){ const t = ltTarget(); if (phIdx(t) >= 0) return 'Preheat'; return t === 'lantern' ? 'Lantern' : ((S.profiles[t] || {}).name || 'P' + (t + 1)); }
 function ltCanShow(){ return S.mode === 'live' && !(S.state >= 7 && S.state <= 9); }
 function ltWrite(blobOrHex){ if (!ltCanShow()) return; clearTimeout(previewTimer); ledJob(() => previewWrite(blobOrHex).catch(() => {})); }
 // the Proxy only takes solid colors so far, so a mood shows as its main color there
@@ -5487,6 +5522,7 @@ function ltShowCurrent(){
   if (LT.pending) return ltShowRef(LT.pending);
   const t = ltTarget();
   if (t === 'lantern') return store.lanternMood ? ltShowRef(store.lanternMood) : ltWrite(store.lantern || '#ffffff');
+  if (phIdx(t) >= 0){ const pi = phIdx(t); return phMood(pi) ? ltShowRef(phMood(pi)) : phColor(pi) ? ltWrite(phColor(pi)) : undefined; }
   clearTimeout(previewTimer);
   ledJob(async () => {
     if (!LT.on || !ltCanShow()) return;
@@ -5618,6 +5654,13 @@ function swatchStyle(ref){
 }
 async function writeMoodTo(target, ref){
   const name = ref.name || 'Mood';
+  const pi = phIdx(target);
+  if (pi >= 0){
+    phSet(pi, JSON.parse(JSON.stringify(ref)));
+    toast(`${name} will show while ${(S.profiles[pi] || {}).name || 'P' + (pi + 1)} heats up`);
+    setTimeout(() => { if (moodTarget === target){ moodTarget = null; show('prof'); drawProfiles(); } }, 700);
+    return;
+  }
   if (target === 'lantern'){
     store.lanternMood = ref; save(); drawLightsState(); toast(`${name} picked for the lantern`);
     if (!needLive('light the lantern')) return;
@@ -5651,7 +5694,7 @@ async function applyMood(ref){
   drawMoods();
 }
 function moodTile(ref, idx, group){
-  const on = LT.on && LT.pending ? sameMood(LT.pending, ref) : moodTarget === 'lantern' ? store.lanternMood && sameMood(store.lanternMood, ref) : S.profiles[moodTarget ?? S.active].mood && sameMood(S.profiles[moodTarget ?? S.active].mood, ref);
+  const on = LT.on && LT.pending ? sameMood(LT.pending, ref) : phIdx(moodTarget) >= 0 ? sameMood(phMood(phIdx(moodTarget)), ref) : moodTarget === 'lantern' ? store.lanternMood && sameMood(store.lanternMood, ref) : S.profiles[moodTarget ?? S.active].mood && sameMood(S.profiles[moodTarget ?? S.active].mood, ref);
   const tplName = ref.kind === 'excl' ? 'Exclusive' : ref.tag === ZONE_TAG ? 'Zones' : (MOODS.tpl[ref.tag] || {}).name || '';
   return `<button class="mood" data-mg="${group}" data-mi="${idx}" aria-pressed="${!!on}"><i class="mood-sw" style="${swatchStyle(ref)}"></i>${group === 'm' ? '<span class="medit">Edit</span>' : ''}<b>${esc(ref.name)}</b><span>${esc(tplName)}</span></button>`;
 }
@@ -5701,7 +5744,7 @@ function rndCard(){
   return `<div class="sgroup" id="rndCard"><div class="row between"><span class="label">Randomizer</span><span class="muted" style="font-size:12px">Random colors + effect</span></div>
     ${r ? `<div class="mood" style="pointer-events:none;width:100%;max-width:none"><i class="mood-sw" style="${swatchStyle(r)}"></i><b>${esc(r.name)}</b><span>${esc(t)}${r.meta.userColors.length ? ' · ' + r.meta.userColors.length + ' colors' : ''}</span></div>` : '<p class="muted" style="margin:0">Tap Shuffle for a random color combo and effect.</p>'}
     <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" id="rndGo" style="flex:1">${r ? 'Shuffle again' : 'Shuffle'}</button>${RND.hist.length > 1 ? '<button class="btn" id="rndBack">Back</button>' : ''}</div>
-    ${r ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="rndSet" style="flex:1">Set on ${esc(((moodTarget ?? S.active) === 'lantern' ? 'lantern' : (S.profiles[moodTarget ?? S.active] || {}).name || 'profile').slice(0, 10))}</button><button class="btn" id="rndSave" style="flex:1">Save mood</button></div>` : ''}</div>`;
+    ${r ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="rndSet" style="flex:1">Set on ${esc((phIdx(moodTarget) >= 0 ? 'preheat' : (moodTarget ?? S.active) === 'lantern' ? 'lantern' : (S.profiles[moodTarget ?? S.active] || {}).name || 'profile').slice(0, 10))}</button><button class="btn" id="rndSave" style="flex:1">Save mood</button></div>` : ''}</div>`;
 }
 // keep the shuffled mood showing on the device while you're on Lights (cleared when you leave the page)
 function rndShow(ref){
@@ -5761,7 +5804,7 @@ function shufSheet(i){
   });
 }
 function drawMoods(){
-  { const el = $('#moodFor'); if (el){ const t = moodTarget ?? S.active, n = t === 'lantern' ? 'the lantern' : ((S.profiles[t] || {}).name || 'P' + (t + 1)); el.textContent = `Tap a mood to set it on ${n}`; } }
+  { const el = $('#moodFor'); if (el){ const t = moodTarget ?? S.active, n = phIdx(t) >= 0 ? `${(S.profiles[phIdx(t)] || {}).name || 'P' + (phIdx(t) + 1)} preheat` : t === 'lantern' ? 'the lantern' : ((S.profiles[t] || {}).name || 'P' + (t + 1)); el.textContent = `Tap a mood to set it on ${n}`; } }
   const box = $('#moodLib'); if (!box) return;
   const tgt = moodTarget ?? S.active;
   $('#moodTarget').innerHTML = S.profiles.map((p, i) => `<button data-mt="${i}" aria-pressed="${tgt === i}">${esc(p.name.slice(0, 7))}</button>`).join('') + `<button data-mt="lantern" aria-pressed="${tgt === 'lantern'}">Lantern</button>`;
@@ -6631,6 +6674,7 @@ $('#moodLib').addEventListener('click', e => {
   const t = e.target.closest('[data-mg]'); if (!t) return;
   const ref = moodFromTile(t.dataset.mg, +t.dataset.mi);
   if (ed2){ const li = store.myMoods.findIndex(m => m.id === ref.id); openMoodEditor(Object.assign({}, ref, { localIdx: li >= 0 ? li : null, name: li >= 0 ? ref.name : ref.name + ' copy' })); return; }
+  if (phIdx(moodTarget) >= 0){ if (LT.on) ltShowRef(ref); writeMoodTo(moodTarget, ref); drawMoods(); return; } // preheat pick: no save bar, it lives in the app
   ltPick(ref);
 });
 $('#moodEditor').addEventListener('click', async e => {
