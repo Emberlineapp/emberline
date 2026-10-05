@@ -5682,10 +5682,16 @@ function rndCard(){
     <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" id="rndGo" style="flex:1">${r ? 'Shuffle again' : 'Shuffle'}</button>${RND.hist.length > 1 ? '<button class="btn" id="rndBack">Back</button>' : ''}</div>
     ${r ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="rndSet" style="flex:1">Set on ${esc(((moodTarget ?? S.active) === 'lantern' ? 'lantern' : (S.profiles[moodTarget ?? S.active] || {}).name || 'profile').slice(0, 10))}</button><button class="btn" id="rndSave" style="flex:1">Save mood</button></div>` : ''}</div>`;
 }
+// keep the shuffled mood showing on the device while you're on Lights (cleared when you leave the page)
+function rndShow(ref){
+  if (S.mode !== 'live' || (S.state >= 7 && S.state <= 9)) return;
+  let blob; try { blob = S.api === 2 ? (moodColors(ref)[0] || '#ffffff') : moodPayload(ref); } catch(e){ return; }
+  clearTimeout(previewTimer); ledJob(() => previewWrite(blob).catch(() => {}));
+}
 function rndWire(){
   const go = $('#rndGo'); if (!go) return;
-  go.onclick = () => { RND.cur = rndMood(); RND.hist.push(RND.cur); if (RND.hist.length > 20) RND.hist.shift(); drawMoods(); previewMood(RND.cur, 6000); };
-  const bk = $('#rndBack'); if (bk) bk.onclick = () => { RND.hist.pop(); RND.cur = RND.hist[RND.hist.length - 1] || null; drawMoods(); if (RND.cur) previewMood(RND.cur, 6000); };
+  go.onclick = () => { RND.cur = rndMood(); RND.hist.push(RND.cur); if (RND.hist.length > 20) RND.hist.shift(); drawMoods(); rndShow(RND.cur); };
+  const bk = $('#rndBack'); if (bk) bk.onclick = () => { RND.hist.pop(); RND.cur = RND.hist[RND.hist.length - 1] || null; drawMoods(); if (RND.cur) rndShow(RND.cur); };
   const st = $('#rndSet'); if (st) st.onclick = async () => { try { await writeMoodTo(moodTarget ?? S.active, RND.cur); } catch(e){ toast('Could not set it: ' + (e.message || e)); } drawMoods(); };
   const sv = $('#rndSave'); if (sv) sv.onclick = () => { const m = { id: 'local-' + Date.now(), name: RND.cur.name, tag: RND.cur.tag, meta: JSON.parse(JSON.stringify(RND.cur.meta)) }; store.myMoods.unshift(m); save(); toast(`Saved "${m.name}" to your moods`); drawMoods(); };
 }
