@@ -28,6 +28,12 @@
 .shareb{position:relative;flex:none;width:48px;height:48px;min-width:48px;padding:0!important;border-radius:50%}
 #shareBtn.shareb svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);margin:0}
 #shareBtn.shareb svg{width:24px!important;height:24px!important;min-width:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.gear-chip.ed{background:linear-gradient(135deg,var(--e1),var(--e2));color:#fff;box-shadow:0 4px 16px color-mix(in srgb,var(--e1) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.25);text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.gear-chip.ed svg{stroke:#fff}
+.gear-chip.ed.light{color:#15151a;text-shadow:none}.gear-chip.ed.light svg{stroke:#15151a}
+.gear-chip.ed small{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:99px;background:rgba(0,0,0,.25);margin-left:2px}
+.gear-chip.ed.light small{background:rgba(0,0,0,.12)}
+.ed-card{border-color:color-mix(in srgb,var(--e1) 75%,transparent)!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--e1) 55%,transparent),0 12px 44px color-mix(in srgb,var(--e1) 30%,transparent)!important;background-image:linear-gradient(165deg,color-mix(in srgb,var(--e1) 48%,transparent),color-mix(in srgb,var(--e2) 18%,transparent) 42%,transparent 72%)!important;border-width:1.5px!important}
 </style></head><body>
 <div class="spl" id="spl" aria-label="Loading Emberline" role="status">
   <div class="spl-in">
@@ -4085,16 +4091,34 @@ async function lbCall(body){
 // the devices you own, shown on your profile ("peak:Onyx", "peak", "proxy")
 function myGear(){
   const out = [];
-  try { devList().forEach(d => { const k = d.series === 'toad' ? 'proxy' : 'peak' + (d.edition ? ':' + String(d.edition).replace(/[^A-Za-z0-9 ]/g, '').slice(0, 24) : ''); if (!out.includes(k)) out.push(k); }); } catch(e){}
+  try { devList().forEach(d => { const k = d.series === 'toad' ? 'proxy' + (d.edition && d.edition !== 'Onyx' ? ':' + String(d.edition).replace(/[^A-Za-z0-9 ]/g, '').slice(0, 24) : '') : 'peak' + (d.edition ? ':' + String(d.edition).replace(/[^A-Za-z0-9 ]/g, '').slice(0, 24) : ''); if (!out.includes(k)) out.push(k); }); } catch(e){}
   return out.slice(0, 6);
 }
+// special edition colors, matched to the Puffco web app's edition themes
+const EDITION_STYLE = {
+  Desert:{ c:['#B29F8D', '#7d6a58'] }, Flourish:{ c:['#467352', '#2c5236'] }, Storm:{ c:['#3856AB', '#8099FF'] },
+  Daybreak:{ c:['#DEA26C', '#7D1E20'] }, Plasma:{ c:['#CC00FF', '#F66300'] }, Glacier:{ c:['#D8F8FA', '#65B9C8'], light:true },
+  Pearl:{ c:['#E8E8E8', '#B3B3B3'], light:true }, Opal:{ c:['#C1C1C1', '#838383'], light:true }, Indiglow:{ c:['#5C71CF', '#701F78'] },
+  Guardian:{ c:['#8a8a8a', '#4a4a4a'] }, Haze:{ c:['#C3C7E8', '#7A7D91'], light:true }, Pine:{ c:['#3f5b45', '#22342a'] }
+};
+// tint a profile card with the owner's special edition (limited editions first)
+function edCard(el, gear){
+  if (!el) return; const eds = (gear || []).map(k => k.includes(':') ? k.split(':')[1] : '').filter(e => EDITION_STYLE[e]);
+  const e = eds.find(x => LIMITED_ED.includes(x)) || eds[0], st = e && EDITION_STYLE[e];
+  el.classList.toggle('ed-card', !!st);
+  if (st){ el.style.setProperty('--e1', st.c[0]); el.style.setProperty('--e2', st.c[1]); } else { el.style.removeProperty('--e1'); el.style.removeProperty('--e2'); }
+}
+const LIMITED_ED = ['Opal', 'Indiglow', 'Guardian', 'Desert', 'Flourish', 'Storm', 'Daybreak', 'Plasma', 'Glacier'];
 function gearHtml(list, empty){
   if (!list || !list.length) return empty ? '<div class="gear"><span class="label">Gear</span><span class="muted" style="font-size:13px">Not shared yet</span></div>' : '';
-  const ic = k => k === 'proxy'
+  const ic = k => k.startsWith('proxy')
     ? '<svg viewBox="0 0 24 24"><path d="M10 3h4l1 5H9z"/><rect x="7" y="8" width="10" height="3" rx="1"/><rect x="7" y="11" width="10" height="10" rx="3"/></svg>'
     : '<svg viewBox="0 0 24 24"><path d="M10 2h4v9h-4z"/><path d="M8 11h8l1 3H7z"/><rect x="6" y="14" width="12" height="8" rx="2"/></svg>';
-  const name = k => k === 'proxy' ? 'Proxy' : 'Peak Pro' + (k.includes(':') ? ' · ' + k.split(':')[1] : '');
-  return `<div class="gear"><span class="label">Gear</span><div class="gear-list">${list.map(k => `<span class="gear-chip">${ic(k)}${esc(name(k))}</span>`).join('')}</div></div>`;
+  const ed = k => k.includes(':') ? k.split(':')[1] : '';
+  const name = k => (k.startsWith('proxy') ? 'Proxy' : 'Peak Pro') + (ed(k) ? ' · ' + ed(k) : '');
+  const chip = k => { const st = EDITION_STYLE[ed(k)]; if (!st) return `<span class="gear-chip">${ic(k)}${esc(name(k))}</span>`;
+    return `<span class="gear-chip ed${st.light ? ' light' : ''}" style="--e1:${st.c[0]};--e2:${st.c[1]}">${ic(k)}${esc(name(k))}${LIMITED_ED.includes(ed(k)) ? '<small>Limited</small>' : ''}</span>`; };
+  return `<div class="gear"><span class="label">Gear</span><div class="gear-list">${list.map(chip).join('')}</div></div>`;
 }
 function lbPayload(){
   const r = myRank(), m = lbMonth(), me = LB.me && LB.me.month === m ? LB.me : null;
@@ -4174,12 +4198,12 @@ function openPlayer(r){
     ${sc.length ? `<div class="lbp-shelf">${sc.map(k => `<div data-bv="${bvResolve(k, r)}">${showBadge(k, undefined, r)}<span>${esc(showName(k, r))}</span></div>`).join('')}</div>` : '<p class="muted" style="margin:0;text-align:center">No showcase badges yet.</p>'}
     ${isMe ? '' : meId ? `<button class="btn soc-follow" data-follow="${r.id}" style="width:100%">Follow</button>`
       : '<p class="muted" style="margin:0;text-align:center;font-size:13px">Make your profile in Social to follow people.</p>'}</div>`;
-  socPaintFollow(r.id); el.hidden = false; applyHaptics();
+  edCard(el.querySelector('.wl-card'), isMe ? myGear() : r.gear); socPaintFollow(r.id); el.hidden = false; applyHaptics();
   const fillCounts = () => socCounts(r.id).then(c => { if (el.hidden) return; el.querySelectorAll('[data-cnt]').forEach(b => { b.textContent = c[b.dataset.cnt]; }); });
   fillCounts();
   // grab their latest row so gear shows even if the list we opened from is old
   if (!isMe && r.id) sbRows(`/rest/v1/players?select=${SOC_COLS}&id=eq.${r.id}`).then(rows => { const f = rows && rows[0]; if (!f || el.hidden) return;
-    if (Array.isArray(f.gear)){ r.gear = f.gear; const g = el.querySelector('#lbpGear'); if (g) g.innerHTML = gearHtml(f.gear, true); } }).catch(() => {});
+    if (Array.isArray(f.gear)){ r.gear = f.gear; const g = el.querySelector('#lbpGear'); if (g) g.innerHTML = gearHtml(f.gear, true); edCard(el.querySelector('.wl-card'), f.gear); } }).catch(() => {});
   el.onclick = async e => {
     if (e.target === el || e.target.id === 'lbpClose'){ el.hidden = true; return; }
     const f = e.target.closest('[data-follow]'); if (f){ e.stopPropagation(); const was = SOC.following.has(r.id);
@@ -4639,6 +4663,7 @@ function drawSocial(){
       ${sc.length ? `<div class="lbp-shelf">${sc.map(k => `<div data-bv="${bvResolve(k, { tier: myRank().tier.n })}">${showBadge(k, undefined, { tier: myRank().tier.n })}<span>${esc(showName(k, { tier: myRank().tier.n }))}</span></div>`).join('')}</div>` : ''}
       <button class="btn" id="socEdit">Edit profile</button>`);
   }
+  edCard(meEl, me && me.username ? myGear() : []);
   // search results
   const res = $('#socResults');
   if (res){
@@ -5263,6 +5288,7 @@ function updateCluster(){
 
 /* ================= mood lights (official format) ================= */
 const MOODS = JSON.parse(document.getElementById('moodData').textContent);
+const PROXY_EDITIONS = { 0:'Onyx', 1:'Haze', 2:'Pine' }; // from the Puffco web app's product list
 const EDITIONS = { 0:'OG', 21:'OG', 1:'Opal', 22:'Opal', 2:'Indiglow', 4:'Guardian', 12:'Pearl', 13:'Onyx', 15:'Desert', 17:'Flourish', 19:'Storm', 23:'Daybreak', 25:'Plasma', 26:'Glacier' };
 /* ---- Emberline native effects: built for the Peak's own light engine, so they save to the device and run smooth without the app ---- */
 const FX_UI = (min, max, def) => [
@@ -5872,7 +5898,7 @@ function loadAccountProfile(i, slot){
 function revStr(v){ const L = 'ABCDEFGHJKMNPRTUVWXYZ'; if (!(v > 0)) return 'X*'; let s = '', n = v - 1; while (n >= 0){ s = L[n % L.length] + s; n = Math.floor(n / L.length) - 1; } return s; }
 slowPoll.n = 0;
 async function readDeviceInfo(){
-  try { S.edition = isProxy() ? null : (EDITIONS[await ble.u32('/p/sys/hw/mdcd')] || null); } catch(e){}
+  try { const mc = await ble.u32('/p/sys/hw/mdcd'); S.edition = isProxy() ? (PROXY_EDITIONS[mc] || null) : (EDITIONS[mc] || null); } catch(e){}
   try { S.devName = await ble.str('/u/sys/name'); } catch(e){}
   try { const r = await ble.read('/p/sys/fw/ver', 4); S.fw = revStr(r[0]); } catch(e){}
   try { const v = await ble.f32('/u/app/rdym/hc'); S.readyMode = v >= 0 && v < 4 ? Math.round(v) : -1; } catch(e){ S.readyMode = null; }
