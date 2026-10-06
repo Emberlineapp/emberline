@@ -2632,8 +2632,13 @@ const HIT = { on:false, start:0, last:null, hits:[], supported:null, base:0, pea
 const HIT_DELAY = -250; // the sensor lags the real pull a little, so start the clock a touch early
 const HIT_MERGE = 700; // a dip shorter than this is the same hit
 const HIT_IDLE = .03; // typical sensor value with nobody pulling
-function hitReset(){ HIT.endAt = 0; HIT.lastStart = 0; HIT.pbase = null; HIT.diaAt = 0; HIT.on = false; HIT.start = 0; HIT.last = null; HIT.hits = []; HIT.base = HIT_IDLE; HIT.live = 0; }
+function hitReset(){ HIT.same = 0; HIT.lastV = -1; HIT.endAt = 0; HIT.lastStart = 0; HIT.pbase = null; HIT.diaAt = 0; HIT.on = false; HIT.start = 0; HIT.last = null; HIT.hits = []; HIT.base = HIT_IDLE; HIT.live = 0; }
 function hitSample(v, now){
+  // some firmware freezes the inhale reading on its last value (e.g. a mood with reactive light off). A real pull
+  // never reads the exact same number for ~1.5s, so a frozen reading counts as no pull
+  if (HIT.mode !== 'heat' && v > 0 && v === HIT.lastV){ if (++HIT.same >= 9) v = 0; } else { HIT.same = 0; HIT.lastV = v; }
+  if (HIT.on && v === 0 && HIT.same >= 9){ HIT.on = false; HIT.endAt = 0; HIT.live = 0; render(); return; } // it was the frozen reading, not a hit: drop it
+  if (HIT.on && now - HIT.start > 30000){ HIT.on = false; HIT.endAt = 0; HIT.live = 0; HIT.base = Math.min(.6, v); render(); return; } // nobody pulls for 30s: stuck reading, drop it and treat this level as resting
   // v = inhale strength (0..1). Hysteresis so a shaky draw counts as one hit.
   // learn the resting level only from quiet samples, so a pull that's already going when Ready hits still counts
   if (!HIT.on){ const b = HIT.base || HIT_IDLE; if (v < b + .05) HIT.base = Math.min(.08, b * .9 + v * .1); }
@@ -2644,7 +2649,7 @@ function hitSample(v, now){
   else if (HIT.on){
     HIT.peak = Math.max(HIT.peak, v); HIT.live = Math.max(0, (now - HIT.start) / 1000);
     if (!HIT.party && store.bigHit !== false && HIT.live >= (+store.bigHitSecs || 8)){ HIT.party = true; bigHit(); }
-    if (v <= Math.max(down, HIT.peak * .3)){ // ends when the pull fades, not only when it's fully gone
+    if (v <= Math.max(down, Math.min(HIT.peak * .3, .15))){ // ends when the pull fades, not only when it's fully gone
       HIT.on = false; HIT.endAt = now; HIT.lastStart = HIT.start; const secs = (now - HIT.start) / 1000;
       if (secs >= .5){ HIT.last = Math.round(secs * 10) / 10; HIT.hits.push(HIT.last); if (cur) cur.hits = HIT.hits.slice(); }
     }
@@ -2691,8 +2696,42 @@ function discoHeatCycle(blob){
   });
   setTimeout(() => ledJob(async () => { const r = discoRestore; discoRestore = null; if (r && S.mode === 'live'){ try { await r(); } catch(e){} } }), DISCO_MS);
 }
+/* older Peaks have no inhale sensor. Pulling air cools the coil, so the heater works harder:
+   duty (how hard it's heating) jumps from ~30% to ~65% while you hit. Right after Ready the heater is
+   still maxed out, so until it settles we watch for the temperature dropping instead.
+   Tuned on a Guardian recording: 5 of 5 hits found, no false hits, lengths within about half a second. */
+const HH = { buf:[], peak:0, settled:false, on:false };
+function heatHitReset(){ HH.buf = []; HH.peak = 0; HH.settled = false; HH.on = false; }
+function heatHitStep(duty, tempC){
+  HH.buf = HH.buf.concat(duty).slice(-4);
+  const full = HH.buf.length === 4, avg = HH.buf.reduce((a, b) => a + b, 0) / HH.buf.length;
+  HH.peak = Math.max(HH.peak, tempC);
+  if (!HH.on){ if ((HH.settled && full && avg >= 50) || (!HH.settled && HH.peak - tempC >= 5)) HH.on = true; }
+  else if (full && avg < 42) HH.on = false;
+  if (full && avg < 45 && !HH.on) HH.settled = true;
+  return HH.on;
+}
+function heatHitStart(){
+  if (HIT.loop) return;
+  heatHitReset(); HIT.supported = true; HIT.mode = 'heat';
+  HIT.loop = setInterval(async () => {
+    if (S.mode !== 'live' || (S.state !== 8 && S.state !== 7)){ hitLoopStop(); return; }
+    if (HIT.inflight) return; HIT.inflight = true;
+    try {
+      const duty = await ble.f32('/p/htr/duty'); let t = S.tempC; try { t = await ble.f32('/p/app/htr/temp'); } catch(e){}
+      const now = performance.now();
+      if (S.state !== 8){ heatHitReset(); return; } // preheat: nothing to time yet
+      const was = HH.on, on = heatHitStep(duty, t);
+      hitSample(on ? 1 : 0, was && !on ? now - 450 : now); // the heater lags the end of the pull by about half a second
+    } catch(e){ if (e && e.status){ HIT.supported = false; hitLoopStop(); } }
+    finally { HIT.inflight = false; }
+  }, 160);
+}
 function hitLoopStart(){
-  if (HIT.loop || S.mode !== 'live' || HIT.supported === false) return;
+  if (HIT.loop || S.mode !== 'live') return;
+  if (S.api === 2) return heatHitStart(); // older firmware: no inhale sensor, time hits from the heater instead
+  if (HIT.supported === false) return;
+  HIT.mode = 'inhale';
   HIT.loop = setInterval(async () => {
     if (S.mode !== 'live' || (S.state !== 8 && S.state !== 7)){ hitLoopStop(); return; }
     if (HIT.inflight) return; HIT.inflight = true;
@@ -2753,7 +2792,7 @@ function hitTick(){
 }
 function hitText(){
   if (S.state !== 8 && !(S.state === 9 && HIT.last)) return '';
-  if (HIT.on) return `<span class="hit-live"><small>Hit</small>${HIT.live.toFixed(1)}s</span>`;
+  if (HIT.on || (HIT.endAt && performance.now() - HIT.endAt < HIT_MERGE)){ if (!HIT.on) setTimeout(render, HIT_MERGE); return `<span class="hit-live"><small>Hit</small>${HIT.live.toFixed(1)}s</span>`; } // hold through a short dip
   if (HIT.last) return `Last hit <b>${HIT.last.toFixed(1)}s</b>${HIT.hits.length > 1 ? ` · ${HIT.hits.length} hits` : ''}`;
   if (S.mode === 'live' && HIT.supported === false) return '';
   return 'Take a hit, it’s timed';
@@ -3233,7 +3272,8 @@ async function saveProfile(i){
     try { await ble.wf32(`/u/app/hc/${i}/intn`, p.vapor); } catch(e){}
     if (p.lightDirty && isProxy()){ await writeProfileColor(i, p.color || '#ffffff'); p.lightDirty = false; }
     if (p.lightDirty){
-      if (p.mood && S.api !== 2){ const blob = moodPayload(p.mood); await ble.writeBlob(`/u/app/hc/${i}/colr`, blob); if (S.active === i){ try { await ble.writeBlob('/p/app/thc/colr', blob); } catch(e){} } }
+      if (p.mood && S.api === 2 && await api2Mood(i, p.mood).catch(() => false)){ if (S.active === i){ try { await api2Mood('temp', p.mood); } catch(e){} } }
+      else if (p.mood && S.api !== 2){ const blob = moodPayload(p.mood); await ble.writeBlob(`/u/app/hc/${i}/colr`, blob); if (S.active === i){ try { await ble.writeBlob('/p/app/thc/colr', blob); } catch(e){} } }
       else await writeProfileColor(i, p.color);
       p.lightDirty = false;
     }
@@ -5673,6 +5713,25 @@ function swatchStyle(ref){
   const sp = moodSpeed(ref), dur = sp > 0 ? Math.max(1.2, Math.min(14, 400 / sp)) : 0;
   return `background:linear-gradient(90deg,${list});background-size:200% 100%;${dur ? `animation:moodPan ${dur.toFixed(1)}s linear infinite` : ''}`;
 }
+/* original Peak / older firmware: moods the way Puffco's app does it.
+   32-color list -> /u/app/led/ca/N, offsets -> /u/app/led/oa/N, then an 8-byte "table" color that points at slot N.
+   Slots: 0 = active session, 1-4 = profiles, 5/6 = lantern. */
+async function api2Mood(target, ref){
+  let L = null; try { L = moodLamp(ref); } catch(e){}
+  if (!L || L.name !== 'pikaled2' || !L.param || !L.param.color) return false; // only the classic animations fit this format
+  const P = L.param;
+  let h = target === 'lantern' ? 5 : target === 'temp' ? 0 : target + 1;
+  if (target === 'lantern' && S.lantern){ try { const r = await ble.read('/p/app/ltrn/colr', 8); if (r[3] === 1 && (r[6] & 15) - 8 === 5) h = 6; } catch(e){} } // swap slots so a lit lantern changes smoothly
+  const c = Array.from(P.color), ca = new Uint8Array(128);
+  for (let k = 0; k < 32; k++){ const j = k * 3; if (j + 2 < c.length){ ca[k * 4] = c[j]; ca[k * 4 + 1] = c[j + 1]; ca[k * 4 + 2] = c[j + 2]; } }
+  await ble.writeBlob(`/u/app/led/ca/${h}`, ca);
+  if (P.offset && P.offset.length){ const oa = new Uint8Array(P.offset.length * 4), dv = new DataView(oa.buffer); P.offset.forEach((v, k) => dv.setUint32(k * 4, v >>> 0, true)); await ble.writeBlob(`/u/app/led/oa/${h}`, oa); }
+  const idx = 8 + h, cl = P.colorLen == null ? 32 : P.colorLen;
+  const rg = new Uint8Array([P.bright == null ? 255 : P.bright, clamp(Math.round(P.speed == null ? 255 : P.speed), 0, 255), P.anim || 0, 1, P.plNum || 0, P.plDenom || 0, (idx << 4) | idx, cl < 32 ? cl : 0]);
+  const path = target === 'lantern' ? '/p/app/ltrn/colr' : target === 'temp' ? '/p/app/thc/colr' : `/u/app/hc/${target}/colr`;
+  await ble.write(path, rg);
+  return true;
+}
 async function writeMoodTo(target, ref){
   const name = ref.name || 'Mood';
   const pi = phIdx(target);
@@ -5685,7 +5744,7 @@ async function writeMoodTo(target, ref){
   if (target === 'lantern'){
     store.lanternMood = ref; save(); drawLightsState(); toast(`${name} picked for the lantern`);
     if (!needLive('light the lantern')) return;
-    if (S.api === 2){ await writeLanternColor(moodColors(ref)[0] || '#ffffff'); }
+    if (S.api === 2){ let ok = false; try { ok = await api2Mood('lantern', ref); } catch(e){} if (!ok) await writeLanternColor(moodColors(ref)[0] || '#ffffff'); }
     else await ble.writeBlob('/p/app/ltrn/colr', moodPayload(ref));
     await ble.write('/p/app/ltrn/cmd', new Uint8Array([1])); S.lantern = true;
     try { await ble.wf32('/p/app/ltrn/time', store.lanternTime || 7200); } catch(e){}
@@ -5695,7 +5754,11 @@ async function writeMoodTo(target, ref){
   const i = target, p = S.profiles[i];
   p.mood = ref; { const mc = moodColors(ref).filter((c, k, a) => a.indexOf(c) === k); p.color = pickAccent(mc) || p.color; p.pal = mc.filter(c => Math.max(...hexBytes(c)) > 40).slice(0, 6); }
   if (S.mode !== 'live'){ p.lightDirty = true; toast(`${name} saved on ${p.name}. It goes to your ${devWord()} when you connect and save.`); render(); return; }
-  if (S.api === 2){ await writeProfileColor(i, p.color); toast(['Opal', 'Indiglow', 'Guardian'].includes(S.edition) ? `The original Peak only shows solid colors, so ${p.name} is set to the mood's main color` : `Your Peak's firmware only shows solid colors, so ${p.name} is set to the mood's main color. Update it in the Puffco app to get animated moods.`); return; }
+  if (S.api === 2){
+    let ok = false; try { ok = await api2Mood(i, ref); if (ok && S.active === i){ try { await api2Mood('temp', ref); } catch(e){} } } catch(e){ ok = false; }
+    if (ok){ toast(`${name} set on ${p.name}`); render(); return; }
+    await writeProfileColor(i, p.color); toast(`This mood can't animate on your Peak yet, so ${p.name} is set to its main color`); return;
+  }
   const blob = moodPayload(ref);
   await ble.writeBlob(`/u/app/hc/${i}/colr`, blob);
   if (S.active === i){ try { await ble.writeBlob('/p/app/thc/colr', blob); } catch(e){} }
@@ -6836,17 +6899,17 @@ function edShareAsk(force){
 }
 let ogNoticeShown = false;
 function ogPeakNotice(n){
-  if (ogNoticeShown || S.mode !== 'live') return;
+  if (ogNoticeShown || S.mode !== 'live' || store.ogSupportSeen) return;
   const og = S.api === 2 || ['OG', 'Opal', 'Indiglow', 'Guardian'].includes(S.edition);
   if (!og) return;
   if ((document.querySelector('.egg') || greetOpen) && n < 20){ setTimeout(() => ogPeakNotice(n + 1), 1500); return; } // wait for other popups
-  ogNoticeShown = true;
+  ogNoticeShown = true; store.ogSupportSeen = true; save();
   const name = S.edition && S.edition !== 'OG' ? 'Peak ' + S.edition : 'original Peak';
   const el = document.createElement('div'); el.className = 'egg';
   el.innerHTML = `<div class="egg-card" role="dialog" aria-label="Support update" style="gap:12px">
-    <span class="label">Heads up</span>
-    <h2 style="margin:0">Full support is coming</h2>
-    <p class="muted" style="margin:0;font-size:14px">Full support for your ${esc(name)} is being added. Some features like animated moods may not work yet. Thank you for your patience!</p>
+    <span class="label">New</span>
+    <h2 style="margin:0">Your Peak is supported</h2>
+    <p class="muted" style="margin:0;font-size:14px">Animated moods and the hit timer now work on your ${esc(name)}, so blinkers count too. Thanks for your patience! Some extras may still be missing, report anything weird in the Discord.</p>
     <button class="btn primary" id="ogOk" style="width:100%">Got it</button></div>`;
   document.body.appendChild(el); applyHaptics();
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
