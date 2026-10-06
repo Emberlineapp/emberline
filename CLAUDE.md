@@ -12,6 +12,7 @@ Single-file web app (index.html) that controls Puffco Peak Pro, original Peak (O
 - Test-first for risky features: put it in the test build, I try it, then I say "add to live".
 - Keep the test and live builds in sync except for test-only tools.
 - The test build must never add RP to the leaderboard.
+- Every new feature in the test build gets a button in the test tools (Settings, test link only) so I can try it.
 - After changing code, run a syntax check on the script blocks before pushing.
 
 ## Device notes
