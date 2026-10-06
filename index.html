@@ -2632,7 +2632,7 @@ const HIT = { on:false, start:0, last:null, hits:[], supported:null, base:0, pea
 const HIT_DELAY = -250; // the sensor lags the real pull a little, so start the clock a touch early
 const HIT_MERGE = 700; // a dip shorter than this is the same hit
 const HIT_IDLE = .03; // typical sensor value with nobody pulling
-function hitReset(){ HIT.same = 0; HIT.lastV = -1; HIT.endAt = 0; HIT.lastStart = 0; HIT.pbase = null; HIT.diaAt = 0; HIT.on = false; HIT.start = 0; HIT.last = null; HIT.hits = []; HIT.base = HIT_IDLE; HIT.live = 0; }
+function hitReset(){ HIT.lastSt = -1; HIT.armed = false; HIT.quiet = 0; HIT.same = 0; HIT.lastV = -1; HIT.endAt = 0; HIT.lastStart = 0; HIT.pbase = null; HIT.diaAt = 0; HIT.on = false; HIT.start = 0; HIT.last = null; HIT.hits = []; HIT.base = HIT_IDLE; HIT.live = 0; }
 function hitSample(v, now){
   // some firmware freezes the inhale reading on its last value (e.g. a mood with reactive light off). A real pull
   // never reads the exact same number for ~1.5s, so a frozen reading counts as no pull
@@ -2643,6 +2643,11 @@ function hitSample(v, now){
   // learn the resting level only from quiet samples, so a pull that's already going when Ready hits still counts
   if (!HIT.on){ const b = HIT.base || HIT_IDLE; if (v < b + .05) HIT.base = Math.min(.08, b * .9 + v * .1); }
   const up = Math.max(.12, HIT.base + .1), down = Math.max(.06, HIT.base + .04);
+  // Ready just started: wait until the sensor reads quiet once before timing. Otherwise a reading left over from
+  // preheat (the Proxy holds and slowly fades its last value) counts as a long fake hit
+  if (S.state === 8 && HIT.lastSt !== 8){ HIT.armed = HIT.mode === 'heat'; HIT.quiet = 0; }
+  HIT.lastSt = S.state;
+  if (S.state === 8 && !HIT.armed){ if (v < down){ if (++HIT.quiet >= 2) HIT.armed = true; } else HIT.quiet = 0; render(); return; }
   if (S.state !== 8){ if (HIT.on){ HIT.on = false; const secs = (now - HIT.start) / 1000; if (secs >= .5){ HIT.last = Math.round(secs * 10) / 10; HIT.hits.push(HIT.last); if (cur) cur.hits = HIT.hits.slice(); } } render(); return; } // not Ready: close any hit that was still open
   if (!HIT.on && v >= up && HIT.endAt && now - HIT.endAt < HIT_MERGE && HIT.hits.length){ HIT.on = true; HIT.hits.pop(); HIT.start = HIT.lastStart; if (cur) cur.hits = HIT.hits.slice(); HIT.last = HIT.hits.length ? HIT.hits[HIT.hits.length - 1] : null; if (!hitRaf) hitRaf = requestAnimationFrame(hitTick); } // short dip: keep counting the same hit
   else if (!HIT.on && v >= up){ HIT.on = true; HIT.start = now + HIT_DELAY; HIT.peak = v; HIT.party = false; buzz(15); if (!hitRaf) hitRaf = requestAnimationFrame(hitTick); }
