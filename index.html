@@ -2549,6 +2549,8 @@ async function afterConnect(quick){
     })();
     return;
   }
+  if (addingFrom && ble.dev && ble.dev.id === addingFrom){ setTimeout(() => toast('That connected your same device again. Turn it off (hold the button) and tap Add a device again to find the other one.'), 1800); }
+  addingFrom = null;
   S.mode = 'live'; S.name = ble.dev.name || 'Peak Pro'; failStreak = 0; S.devName = null; S.edition = null; PROXY_TPL = null; // don't carry the last device's name over
   await detectLedApi();
   try { S.state = await ble.u8('/p/app/stat/id'); } catch(e){}
@@ -2901,8 +2903,11 @@ async function switchToDevice(d){
   setConnUI('idle');
   startConnect(false, true);   // asks for that device by name (a tap may be needed outside Path)
 }
+let addingFrom = null;
 async function addDevice(){
   toggleDevMenu(false);
+  addingFrom = (ble.dev && ble.dev.id) || store.lastDeviceId || null; // to spot the picker handing back the same device
+  if (IS_PATH && addingFrom) toast('Tip: turn off your other device first so it only finds the new one');
   if (S.mode === 'live' || ble.connected){ manualDisconnect = true; reconnectRun++; stopPolling(); try { ble.disconnect(true); } catch(e){} S.mode = 'off'; await sleep(250); }
   ble.dev = null; manualDisconnect = false; setConnUI('idle');
   startConnect(true, false);
@@ -4850,7 +4855,7 @@ function drawLeaderboard(){
   }
   const rows = LB.rows || [], meId = LB.me && LB.me.id, mine = rows.findIndex(r => r.id === meId);
   const row = (r, i) => lbRowHtml(r, i, meId);
-  el.innerHTML = `<div class="row between"><span class="label">Leaderboard · ${new Date().toLocaleDateString([], { month:'long' })}</span><button class="btn small ghost" id="lbEdit">Edit profile</button></div>
+  el.innerHTML = `<div class="row between"><span class="label">Leaderboard · ${new Date().toLocaleDateString([], { month:'long' })}</span></div>
     ${LB.err ? `<p class="acct-err">${esc(LB.err)}</p>` : ''}
     ${LB.rows == null ? '<p class="muted" style="margin:0">Loading…</p>' : rows.length ? `<div class="lb-list">${rows.slice(0, LB.expand ? 100 : LB_SHOW).map(row).join('')}</div>` : '<p class="muted" style="margin:0">Nobody has points yet this month. Take a dab to get on the board.</p>'}
     ${mine >= (LB.expand ? 100 : LB_SHOW) ? `<div class="lb-list lb-you">${row(rows[mine], mine)}</div>` : ''}
