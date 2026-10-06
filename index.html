@@ -2510,7 +2510,7 @@ async function startConnect(pickNew, auto){
   setConnUI('connecting', { label:'Choose your Peak' });
   let stage = 'request';
   try {
-    if (pickNew || !ble.dev){ await ble.request(store.showAll, auto ? store.lastDeviceName : null, auto ? store.lastDeviceId : null); }
+    if (pickNew || !ble.dev){ const all = store.showAll || (pickNew && IS_PATH && addingFrom); await ble.request(all, auto ? store.lastDeviceName : null, auto ? store.lastDeviceId : null); } // adding a 2nd device in Path: show every nearby device, or Path just hands back the one it remembers
     stage = 'gatt'; setConnUI('connecting', { label:'Connecting…' });
     await ble.attach(s => { stage = s; if (s === 'auth') setConnUI('connecting', { label:'Unlocking…' }); });
     stage = 'read'; setConnUI('connecting', { label:'Reading your Peak…' });
@@ -2907,7 +2907,7 @@ let addingFrom = null;
 async function addDevice(){
   toggleDevMenu(false);
   addingFrom = (ble.dev && ble.dev.id) || store.lastDeviceId || null; // to spot the picker handing back the same device
-  if (IS_PATH && addingFrom) toast('Tip: turn off your other device first so it only finds the new one');
+  if (IS_PATH && addingFrom) toast('Pick your new device from the list. Puffcos show up by the name you gave them.');
   if (S.mode === 'live' || ble.connected){ manualDisconnect = true; reconnectRun++; stopPolling(); try { ble.disconnect(true); } catch(e){} S.mode = 'off'; await sleep(250); }
   ble.dev = null; manualDisconnect = false; setConnUI('idle');
   startConnect(true, false);
