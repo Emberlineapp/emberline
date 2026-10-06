@@ -2634,7 +2634,7 @@ const HIT = { on:false, start:0, last:null, hits:[], supported:null, base:0, pea
 const HIT_DELAY = -250; // the sensor lags the real pull a little, so start the clock a touch early
 const HIT_MERGE = 700; // a dip shorter than this is the same hit
 const HIT_IDLE = .03; // typical sensor value with nobody pulling
-function hitReset(){ HIT.lastSt = -1; HIT.armed = false; HIT.quiet = 0; HIT.same = 0; HIT.lastV = -1; HIT.endAt = 0; HIT.lastStart = 0; HIT.pbase = null; HIT.diaAt = 0; HIT.on = false; HIT.start = 0; HIT.last = null; HIT.hits = []; HIT.base = HIT_IDLE; HIT.live = 0; }
+function hitReset(){ PH.on = false; HIT.lastSt = -1; HIT.armed = false; HIT.quiet = 0; HIT.same = 0; HIT.lastV = -1; HIT.endAt = 0; HIT.lastStart = 0; HIT.pbase = null; HIT.diaAt = 0; HIT.on = false; HIT.start = 0; HIT.last = null; HIT.hits = []; HIT.base = HIT_IDLE; HIT.live = 0; }
 function hitSample(v, now){
   // some firmware freezes the inhale reading on its last value (e.g. a mood with reactive light off). A real pull
   // never reads the exact same number for ~1.5s, so a frozen reading counts as no pull
@@ -2739,6 +2739,11 @@ function heatHitStart(){
     finally { HIT.inflight = false; }
   }, 160);
 }
+/* Proxy inhale reading (from a labeled recording): it jumps to 1.0 within ~0.4s of a pull, sits at 1.0 while you
+   pull, stays at 1.0 about 0.9s after you stop, then fades over ~5s (0.8, 0.5, 0.3...). The fade and the idle
+   wobble (up to ~0.4) are what made fake hits. So a hit is only "reading pinned near 1.0". */
+const PH = { on:false };
+function proxyHitStep(v){ if (!PH.on && v >= .9) PH.on = true; else if (PH.on && v < .88) PH.on = false; return PH.on; }
 function hitLoopStart(){
   if (HIT.loop || S.mode !== 'live') return;
   if (S.api === 2) return heatHitStart(); // older firmware: no inhale sensor, time hits from the heater instead
@@ -2751,7 +2756,11 @@ function hitLoopStart(){
       let v = await ble.f32('/p/app/led/dif'); HIT.supported = true;
       // Proxy: the inhale reading only counts while dynamic inhale is live (dia > 0). Otherwise dif freezes on its last value.
       if (isFinite(v) && isProxy()){ const t = performance.now(); if (!HIT.diaAt || t - HIT.diaAt > 1000){ HIT.diaAt = t; try { HIT.dia = await ble.f32('/p/app/led/dia'); } catch(e){ HIT.dia = 1; } } if (!(HIT.dia > 0)) v = 0; } // dia only checked once a second, so the inhale reading stays fast
-      if (isFinite(v)) hitSample(clamp(v, 0, 1), performance.now());
+      if (isFinite(v)){
+        const now = performance.now();
+        if (isProxy()){ const was = PH.on, on = proxyHitStep(v); HIT.mode = 'proxy'; hitSample(on ? 1 : 0, was && !on ? now - 600 : !was && on ? now - 550 : now); } // Proxy: only a maxed reading is a pull; it pins ~0.8s after you start and lets go ~0.6s after you stop
+        else hitSample(clamp(v, 0, 1), now);
+      }
     }
     catch(e){ if (e && e.status){ HIT.supported = false; hitLoopStop(); } }
     finally { HIT.inflight = false; }
@@ -3087,7 +3096,7 @@ async function readProfiles(){
 
 async function slowPoll(){
   if (++slowPoll.n % 4 === 0) await readBatteryDetail();
-  if (!isProxy()){ try { S.chamber = await ble.u8('/p/htr/chmt'); } catch(e){} } else S.chamber = null; // Proxy has no swappable chamber
+  try { S.chamber = await ble.u8('/p/htr/chmt'); } catch(e){ if (isProxy()) S.chamber = null; } // Proxy: 0 = no atomizer, 4 = atomizer on
   try { S.battery = clamp(Math.round(await ble.f32('/p/bat/soc')),0,100); } catch(e){}
   try { const c = await ble.u8('/p/bat/chg/stat'); S.charging = c === 0 || c === 1; } catch(e){}
   if (S.charging){
@@ -3743,9 +3752,9 @@ function drawHome(){
   $('#gTarget').textContent = `Target ${fmtT(shownTarget)}${U()} · ${p.time}s · ${vaporName(p.vapor)}`;
   $('#adjustRow').hidden = !heatingNow;
   setHTML($('#bBoost'), `<span class="bst"><span>Boost</span><small>+${store.unit === 'F' ? Math.round(p.boostF) : Math.round(p.boostF * 5 / 9)}° +${p.boostT}s</small></span>`);
-  const noCh = S.mode === 'live' && !isProxy() && S.chamber === 0, cb = $('#chamberBanner');
+  const noCh = S.mode === 'live' && S.chamber === 0, cb = $('#chamberBanner');
   cb.hidden = !noCh;
-  if (noCh) cb.innerHTML = '<div class="grow"><b>No chamber detected</b>Seat the chamber firmly to heat up.</div>';
+  if (noCh) cb.innerHTML = isProxy() ? '<div class="grow"><b>No atomizer</b>Attach the atomizer to heat up.</div>' : '<div class="grow"><b>No chamber detected</b>Seat the chamber firmly to heat up.</div>';
   const live = S.mode === 'live';
   const st = $('#gState'); st.textContent = live ? (STATE_NAMES[S.state] || 'Idle') : C.state === 'reconnecting' ? 'Reconnecting' : 'Not connected';
   st.className = 'state-chip' + (live && (S.state === 7 || S.state === 9) ? ' heat' : live && S.state === 8 ? ' ready' : '');
@@ -4270,7 +4279,7 @@ function lbResize(file){
     img.src = url;
   });
 }
-const LB_ERRS = { name_cooldown:'You can only change your username once every 3 days.', banned:'This account is banned from ranked and social. Ask in the Emberline Discord if you think this is a mistake.', puffco_required:'Sign in to Puffco in Settings to join ranked.', username_invalid:'Usernames are 3 to 20 letters, numbers, _ or .', username_taken:'That username is taken.', username_required:'Pick a username first.', avatar_too_big:'That picture is too big.', puffco_auth:'Your Puffco sign-in expired. Sign in again in Settings.', auth:'Couldn’t sign you in. Try again.' };
+const LB_ERRS = { slow_down:'Too fast, try again in a second.', too_many_accounts:'This phone already made new accounts today. Try again tomorrow or ask in the Discord.', new_device:'This phone isn’t linked to your account yet. Open Emberline on the phone you joined with, or ask in the Discord.', name_cooldown:'You can only change your username once every 3 days.', banned:'This account is banned from ranked and social. Ask in the Emberline Discord if you think this is a mistake.', puffco_required:'Sign in to Puffco in Settings to join ranked.', username_invalid:'Usernames are 3 to 20 letters, numbers, _ or .', username_taken:'That username is taken.', username_required:'Pick a username first.', avatar_too_big:'That picture is too big.', puffco_auth:'Your Puffco sign-in expired. Sign in again in Settings.', auth:'Couldn’t sign you in. Try again.' };
 
 /* ---- badge showcase: up to 3 badges on your profile ---- */
 function showBadge(key, size, row){
