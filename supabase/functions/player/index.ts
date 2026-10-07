@@ -130,10 +130,18 @@ Deno.serve(async (req) => {
     const n = (v: unknown) => Math.max(0, Math.min(100000, Math.round(Number(v))));
     // RP can't crash within the same month (a new phone or computer has no local sessions and would send 0)
     const sameMonth = existing && typeof body.month === "string" && existing.month === body.month;
+    // daily limit: going over 1000 RP in one day (UTC) locks you out of ranked for 24h. RP doesn't change while locked
+    const DAY_MAX = 1000, LOCK_MS = 86400000, now = Date.now(), today = new Date(now).toISOString().slice(0, 10);
+    const lockedUntil = existing && existing.locked_until ? new Date(existing.locked_until).getTime() : 0;
     if (Number.isFinite(Number(body.rp))) {
-      const v = n(body.rp);
-      if (sameMonth && v < (existing.rp || 0) - 10) { /* a big drop means a device with no history: keep the server's score (small drops are clean-meter penalties) */ }
-      else { row.rp = v; if (typeof body.tier === "string") row.tier = body.tier.slice(0, 20); }
+      const v = n(body.rp), had = sameMonth ? existing.rp || 0 : 0;
+      // the app sends base = the leaderboard RP it built on. A drop from that number is the rank tax, so allow more of one
+      const maxDrop = Number(body.base) === had ? 100 : 10;
+      const dayBase = sameMonth && existing.rp_day === today ? existing.rp_day_base || 0 : had; // RP when today started
+      if (sameMonth && v < had - maxDrop) { /* a big drop means a device with no history: keep the server's score (small drops are clean-meter and rank tax penalties) */ }
+      else if (sameMonth && lockedUntil > now) { /* locked out of ranked */ }
+      else if (sameMonth && v - dayBase > DAY_MAX) { row.locked_until = new Date(now + LOCK_MS).toISOString(); row.rp_day = today; row.rp_day_base = dayBase; }
+      else { row.rp = v; row.rp_day = today; row.rp_day_base = dayBase; if (typeof body.tier === "string") row.tier = body.tier.slice(0, 20); }
     } else if (typeof body.tier === "string" && !sameMonth) row.tier = body.tier.slice(0, 20);
     if (Number.isFinite(Number(body.blinkers))) { const v = n(body.blinkers); if (!(sameMonth && v < (existing.blinkers || 0))) row.blinkers = v; }
     if (Array.isArray(body.showcase)) {
