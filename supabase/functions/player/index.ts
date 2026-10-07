@@ -156,6 +156,13 @@ Deno.serve(async (req) => {
       row.gear = [...new Set(body.gear.filter((k: unknown) => typeof k === "string" && /^(peak|proxy)(:[A-Za-z0-9 ]{1,24})?$/.test(k)))].slice(0, 6);
     }
     if (typeof body.bio === "string") row.bio = body.bio.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 160);
+    if (body.stats && typeof body.stats === "object") {
+      // profile stats from the app (tap a name to see them): only these numbers, kept in a sane range
+      const st: Record<string, number> = {};
+      for (const k of ["sessions", "hits", "days", "blAll"]) { const v = Number(body.stats[k]); if (Number.isFinite(v)) st[k] = Math.max(0, Math.min(100000, Math.round(v))); }
+      { const v = Number(body.stats.best); if (Number.isFinite(v)) st.best = Math.max(0, Math.min(120, Math.round(v * 10) / 10)); }
+      row.stats = st;
+    }
 
     const q = existing
       ? sb.from("players").update(row).eq("id", id).select().single()
