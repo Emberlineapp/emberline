@@ -2653,6 +2653,7 @@ function previewProfile(i){
 const HIT = { on:false, start:0, last:null, hits:[], supported:null, base:0, peak:0, loop:null, inflight:false, live:0 };
 const HIT_DELAY = -250; // the sensor lags the real pull a little, so start the clock a touch early
 const HIT_MERGE = 700; // a dip shorter than this is the same hit
+const hitMerge = () => HIT.mode === 'heat' ? 1600 : HIT_MERGE; // older Peaks time hits from the heater, which dips mid-pull
 const HIT_IDLE = .03; // typical sensor value with nobody pulling
 function hitReset(){ PH.on = false; HIT.lastSt = -1; HIT.armed = false; HIT.quiet = 0; HIT.same = 0; HIT.lastV = -1; HIT.endAt = 0; HIT.lastStart = 0; HIT.pbase = null; HIT.diaAt = 0; HIT.on = false; HIT.start = 0; HIT.last = null; HIT.hits = []; HIT.base = HIT_IDLE; HIT.live = 0; }
 function hitSample(v, now){
@@ -2676,7 +2677,7 @@ function hitSample(v, now){
   HIT.lastSt = S.state;
   if (S.state === 8 && !HIT.armed){ if (v < down){ if (++HIT.quiet >= 2) HIT.armed = true; } else HIT.quiet = 0; render(); return; }
   if (S.state !== 8){ if (HIT.on){ HIT.on = false; const secs = (now - HIT.start) / 1000; if (secs >= .5){ HIT.last = Math.round(secs * 10) / 10; HIT.hits.push(HIT.last); if (cur) cur.hits = HIT.hits.slice(); } } render(); return; } // not Ready: close any hit that was still open
-  if (!HIT.on && v >= up && HIT.endAt && now - HIT.endAt < HIT_MERGE && HIT.hits.length){ HIT.on = true; HIT.hits.pop(); HIT.start = HIT.lastStart; if (cur) cur.hits = HIT.hits.slice(); HIT.last = HIT.hits.length ? HIT.hits[HIT.hits.length - 1] : null; if (!hitRaf) hitRaf = requestAnimationFrame(hitTick); } // short dip: keep counting the same hit
+  if (!HIT.on && v >= up && HIT.endAt && now - HIT.endAt < hitMerge() && HIT.hits.length){ HIT.on = true; HIT.hits.pop(); HIT.start = HIT.lastStart; if (cur) cur.hits = HIT.hits.slice(); HIT.last = HIT.hits.length ? HIT.hits[HIT.hits.length - 1] : null; if (!hitRaf) hitRaf = requestAnimationFrame(hitTick); } // short dip: keep counting the same hit
   else if (!HIT.on && v >= up){ HIT.on = true; HIT.start = now + HIT_DELAY; HIT.peak = v; HIT.party = false; buzz(15); if (!hitRaf) hitRaf = requestAnimationFrame(hitTick); }
   else if (HIT.on){
     HIT.peak = Math.max(HIT.peak, v); HIT.live = Math.max(0, (now - HIT.start) / 1000);
@@ -2732,13 +2733,19 @@ function discoHeatCycle(blob){
    duty (how hard it's heating) jumps from ~30% to ~65% while you hit. Right after Ready the heater is
    still maxed out, so until it settles we watch for the temperature dropping instead.
    Tuned on a Guardian recording: 5 of 5 hits found, no false hits, lengths within about half a second. */
-const HH = { buf:[], peak:0, settled:false, on:false };
-function heatHitReset(){ HH.buf = []; HH.peak = 0; HH.settled = false; HH.on = false; }
-function heatHitStep(duty, tempC){
-  HH.buf = HH.buf.concat(duty).slice(-4);
+const HH = { buf:[], tb:[], settled:false, on:false, how:'', low:0, t0:0 };
+function heatHitReset(){ HH.buf = []; HH.tb = []; HH.settled = false; HH.on = false; HH.how = ''; HH.low = 0; HH.t0 = 0; }
+function heatHitStep(duty, tempC, now){
+  now = now || performance.now(); if (!HH.t0) HH.t0 = now;
+  HH.buf = HH.buf.concat(duty).slice(-4); HH.tb = HH.tb.concat(tempC).slice(-10); // ~0.6s of duty, ~1.6s of temp
   const full = HH.buf.length === 4, avg = HH.buf.reduce((a, b) => a + b, 0) / HH.buf.length;
-  HH.peak = Math.max(HH.peak, tempC);
-  if (!HH.on){ if ((HH.settled && full && avg >= 50) || (!HH.settled && HH.peak - tempC >= 5)) HH.on = true; }
+  if (!HH.on){
+    if (HH.settled && full && avg >= 50){ HH.on = true; HH.how = 'duty'; }
+    // before the heater settles: a fast temp drop while the heater is working hard. After Ready the temp overshoots and
+    // falls back on its own, but then the heater is backing off (low duty), so that no longer counts as a fake hit
+    else if (!HH.settled && full && avg >= 70 && now - HH.t0 > 1000 && Math.max(...HH.tb) - tempC >= 5){ HH.on = true; HH.how = 'temp'; HH.low = tempC; }
+  }
+  else if (HH.how === 'temp'){ HH.low = Math.min(HH.low, tempC); if (tempC - HH.low >= 1.5 || (full && avg < 42)) HH.on = false; } // pull over: the temp climbs back
   else if (full && avg < 42) HH.on = false;
   if (full && avg < 45 && !HH.on) HH.settled = true;
   return HH.on;
@@ -2753,8 +2760,8 @@ function heatHitStart(){
       const duty = await ble.f32('/p/htr/duty'); let t = S.tempC; try { t = await ble.f32('/p/app/htr/temp'); } catch(e){}
       const now = performance.now();
       if (S.state !== 8){ heatHitReset(); return; } // preheat: nothing to time yet
-      const was = HH.on, on = heatHitStep(duty, t);
-      hitSample(on ? 1 : 0, was && !on ? now - 450 : now); // the heater lags the end of the pull by about half a second
+      const was = HH.on, on = heatHitStep(duty, t, now);
+      hitSample(on ? 1 : 0, was && !on ? now - 450 : !was && on && HH.how === 'temp' ? now - 800 : now); // the heater lags the end of the pull by about half a second; a temp drop takes ~0.8s to show
     } catch(e){ if (e && e.status){ HIT.supported = false; hitLoopStop(); } }
     finally { HIT.inflight = false; }
   }, 160);
@@ -2833,7 +2840,7 @@ function hitTick(){
 }
 function hitText(){
   if (S.state !== 8 && !(S.state === 9 && HIT.last)) return '';
-  if (HIT.on || (HIT.endAt && performance.now() - HIT.endAt < HIT_MERGE)){ if (!HIT.on) setTimeout(render, HIT_MERGE); return `<span class="hit-live"><small>Hit</small>${HIT.live.toFixed(1)}s</span>`; } // hold through a short dip
+  if (HIT.on || (HIT.endAt && performance.now() - HIT.endAt < hitMerge())){ if (!HIT.on) setTimeout(render, hitMerge()); return `<span class="hit-live"><small>Hit</small>${HIT.live.toFixed(1)}s</span>`; } // hold through a short dip
   if (HIT.last) return `Last hit <b>${HIT.last.toFixed(1)}s</b>${HIT.hits.length > 1 ? ` · ${HIT.hits.length} hits` : ''}`;
   if (S.mode === 'live' && HIT.supported === false) return '';
   return 'Take a hit, it’s timed';
@@ -3192,6 +3199,7 @@ function phEnd(){ ledJob(async () => { const r = phRestore; phRestore = null; if
 /* session tracking from state transitions */
 let cur = null;
 function trackSession(prev, st){
+  if ((st === 7 || st === 8) && !HIT.loop && S.mode === 'live' && HIT.supported !== false) hitLoopStart(); // came back after a disconnect while Ready
   checkWarn();
   if (st === 7 && prev !== 7){ hitReset(); hitLoopStart(); phStart(); }
   if (prev === 7 && st !== 7) phEnd(); // start listening during preheat so hits count the moment it's Ready
