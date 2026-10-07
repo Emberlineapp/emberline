@@ -2734,7 +2734,8 @@ function discoHeatCycle(blob){
    still maxed out, so until it settles we watch for the temperature dropping instead.
    Tuned on a Guardian recording: 5 of 5 hits found, no false hits, lengths within about half a second. */
 const HH = { buf:[], tb:[], settled:false, on:false, how:'', low:0, t0:0 };
-function heatHitReset(){ HH.buf = []; HH.tb = []; HH.settled = false; HH.on = false; HH.how = ''; HH.low = 0; HH.t0 = 0; }
+const HEAT_CONFIRM = 1000; // ms the heater has to look like a pull before it counts
+function heatHitReset(){ HH.buf = []; HH.tb = []; HH.settled = false; HH.on = false; HH.how = ''; HH.low = 0; HH.t0 = 0; HH.since = 0; HH.shown = false; }
 function heatHitStep(duty, tempC, now){
   now = now || performance.now(); if (!HH.t0) HH.t0 = now;
   HH.buf = HH.buf.concat(duty).slice(-4); HH.tb = HH.tb.concat(tempC).slice(-10); // ~0.6s of duty, ~1.6s of temp
@@ -2760,8 +2761,12 @@ function heatHitStart(){
       const duty = await ble.f32('/p/htr/duty'); let t = S.tempC; try { t = await ble.f32('/p/app/htr/temp'); } catch(e){}
       const now = performance.now();
       if (S.state !== 8){ heatHitReset(); return; } // preheat: nothing to time yet
-      const was = HH.on, on = heatHitStep(duty, t, now);
-      hitSample(on ? 1 : 0, was && !on ? now - 450 : !was && on && HH.how === 'temp' ? now - 800 : now); // the heater lags the end of the pull by about half a second; a temp drop takes ~0.8s to show
+      const raw = heatHitStep(duty, t, now);
+      // only count it once the heater has looked like a pull for a full second (a short blip at the start of Ready was a
+      // fake hit), then start the clock from when it really began
+      if (raw && !HH.since) HH.since = now; else if (!raw) HH.since = 0;
+      const was = HH.shown, on = raw && now - HH.since >= HEAT_CONFIRM; HH.shown = on;
+      hitSample(on ? 1 : 0, was && !on ? now - 450 : !was && on ? HH.since - (HH.how === 'temp' ? 800 : 0) : now); // the heater lags the end of the pull by about half a second; a temp drop takes ~0.8s to show
     } catch(e){ if (e && e.status){ HIT.supported = false; hitLoopStop(); } }
     finally { HIT.inflight = false; }
   }, 160);
