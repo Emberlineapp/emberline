@@ -2734,6 +2734,27 @@ function discoHeatCycle(blob){
    still maxed out, so until it settles we watch for the temperature dropping instead.
    Tuned on a Guardian recording: 5 of 5 hits found, no false hits, lengths within about half a second. */
 const HH = { buf:[], tb:[], settled:false, on:false, how:'', low:0, t0:0 };
+/* heater recorder for original Peaks: open the site with ?heatrec, run a session, tap Copy and paste it in Discord */
+const HREC = { on:false, t0:0, rows:[] };
+function hrecAdd(now, duty, temp, raw, hit){
+  if (!HREC.on || HREC.rows.length >= 3000) return;
+  HREC.rows.push([Math.round(now - HREC.t0), Math.round(duty), Math.round(temp * 10) / 10, S.state, raw, hit]);
+  const n = document.querySelector('#hrecN'); if (n) n.textContent = HREC.rows.length + ' samples';
+}
+function hrecPanel(){
+  if (!/[?&]heatrec\b/.test(location.search) || document.querySelector('#hrec')) return;
+  const el = document.createElement('div'); el.id = 'hrec';
+  el.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 92px);z-index:60;display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:16px;background:rgba(20,14,30,.92);backdrop-filter:blur(10px);font-size:13px;color:#fff';
+  el.innerHTML = '<b style="flex:1">Heater recorder <span id="hrecN" style="font-weight:400;opacity:.7">0 samples</span></b><button class="btn small primary" id="hrecGo">Record</button><button class="btn small" id="hrecCp">Copy</button>';
+  document.body.appendChild(el);
+  el.querySelector('#hrecGo').onclick = e => { HREC.on = !HREC.on; if (HREC.on){ HREC.rows = []; HREC.t0 = performance.now(); } e.target.textContent = HREC.on ? 'Stop' : 'Record'; };
+  el.querySelector('#hrecCp').onclick = async () => {
+    // tell me what really happened next to the numbers
+    const txt = `heatrec ${S.edition || ''} fw=${S.fw || ''} api=${S.api}\nms,duty,temp,state,raw(1 duty 2 temp),hit\n` + HREC.rows.map(r => r.join(',')).join('\n');
+    try { await navigator.clipboard.writeText(txt); toast('Copied. Paste it in Discord'); } catch(e){ prompt('Copy this', txt); }
+  };
+}
+setTimeout(hrecPanel, 1500);
 const HEAT_CONFIRM = 1000; // ms the heater has to look like a pull before it counts
 function heatHitReset(){ HH.buf = []; HH.tb = []; HH.settled = false; HH.on = false; HH.how = ''; HH.low = 0; HH.t0 = 0; HH.since = 0; HH.shown = false; }
 function heatHitStep(duty, tempC, now){
@@ -2760,12 +2781,12 @@ function heatHitStart(){
     try {
       const duty = await ble.f32('/p/htr/duty'); let t = S.tempC; try { t = await ble.f32('/p/app/htr/temp'); } catch(e){}
       const now = performance.now();
-      if (S.state !== 8){ heatHitReset(); return; } // preheat: nothing to time yet
+      if (S.state !== 8){ heatHitReset(); hrecAdd(now, duty, t, 0, 0); return; } // preheat: nothing to time yet
       const raw = heatHitStep(duty, t, now);
       // only count it once the heater has looked like a pull for a full second (a short blip at the start of Ready was a
       // fake hit), then start the clock from when it really began
       if (raw && !HH.since) HH.since = now; else if (!raw) HH.since = 0;
-      const was = HH.shown, on = raw && now - HH.since >= HEAT_CONFIRM; HH.shown = on;
+      const was = HH.shown, on = raw && now - HH.since >= HEAT_CONFIRM; HH.shown = on; hrecAdd(now, duty, t, raw ? (HH.how === 'temp' ? 2 : 1) : 0, on ? 1 : 0);
       hitSample(on ? 1 : 0, was && !on ? now - 450 : !was && on ? HH.since - (HH.how === 'temp' ? 800 : 0) : now); // the heater lags the end of the pull by about half a second; a temp drop takes ~0.8s to show
     } catch(e){ if (e && e.status){ HIT.supported = false; hitLoopStop(); } }
     finally { HIT.inflight = false; }
