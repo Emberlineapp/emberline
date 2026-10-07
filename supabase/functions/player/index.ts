@@ -127,6 +127,7 @@ Deno.serve(async (req) => {
       if (up.error) return json({ error: "avatar_upload" }, 500);
       row.avatar_url = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?v=" + Date.now();
     }
+    const tierFor = (rp: number) => rp >= 500 ? "Champion" : rp >= 300 ? "Inferno" : rp >= 150 ? "Blaze" : rp >= 50 ? "Flame" : "Ember";
     const n = (v: unknown) => Math.max(0, Math.min(100000, Math.round(Number(v))));
     // RP can't crash within the same month (a new phone or computer has no local sessions and would send 0)
     const sameMonth = existing && typeof body.month === "string" && existing.month === body.month;
@@ -140,14 +141,22 @@ Deno.serve(async (req) => {
       const dayBase = sameMonth && existing.rp_day === today ? existing.rp_day_base || 0 : had; // RP when today started
       if (sameMonth && v < had - maxDrop) { /* a big drop means a device with no history: keep the server's score (small drops are clean-meter and rank tax penalties) */ }
       else if (sameMonth && lockedUntil > now) { /* locked out of ranked */ }
-      else if (sameMonth && v - dayBase > DAY_MAX) { row.locked_until = new Date(now + LOCK_MS).toISOString(); row.rp_day = today; row.rp_day_base = dayBase; }
-      else { row.rp = v; row.rp_day = today; row.rp_day_base = dayBase; if (typeof body.tier === "string") row.tier = body.tier.slice(0, 20); }
-    } else if (typeof body.tier === "string" && !sameMonth) row.tier = body.tier.slice(0, 20);
+      else if (v - dayBase > DAY_MAX) { row.locked_until = new Date(now + LOCK_MS).toISOString(); row.rp_day = today; row.rp_day_base = dayBase; } // every push, including a new account's first one and the first of a month
+      else { row.rp = v; row.rp_day = today; row.rp_day_base = dayBase; row.tier = tierFor(v); } // tier comes from the RP we accepted, not from the app
+    } else if (!sameMonth) row.tier = tierFor(0);
     if (Number.isFinite(Number(body.blinkers))) { const v = n(body.blinkers); if (!(sameMonth && v < (existing.blinkers || 0))) row.blinkers = v; }
+    // badges only the dev hands out (players.awards), and Founder (joined in October 2026), can't be claimed by the app
+    const awards: string[] = existing && Array.isArray(existing.awards) ? existing.awards : [];
+    const joined = existing && existing.created_at ? new Date(existing.created_at).getTime() : Date.now();
+    const handedOut = (k: string) => {
+      if (["sp:bughunter", "sp:discord", "sp:podium"].includes(k)) return awards.includes(k.slice(3));
+      if (k === "sp:founder") return joined < Date.parse("2026-11-01T00:00:00Z");
+      return true;
+    };
     if (Array.isArray(body.showcase)) {
       // up to 3 badges: "dev" (only if you have it) or "YYYY-MM:<tier 0-4>" or "YYYY-MM:now"
       const ok = body.showcase.filter((k: unknown) => typeof k === "string" &&
-        (k === "dev" ? !!(existing && existing.dev) : /^\d{4}-\d{2}:(?:[0-4]|now)$/.test(k) || /^sp:[a-z0-9]{2,16}$/.test(k)));
+        (k === "dev" ? !!(existing && existing.dev) : /^\d{4}-\d{2}:(?:[0-4]|now)$/.test(k) || /^sp:[a-z0-9]{2,16}$/.test(k)) && handedOut(k));
       row.showcase = [...new Set(ok)].slice(0, 3);
     }
     if (typeof body.month === "string" && /^\d{4}-\d{2}$/.test(body.month)) row.month = body.month;
