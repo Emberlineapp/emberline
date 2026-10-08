@@ -75,7 +75,29 @@ Deno.serve(async (req) => {
       if (body.action === "me") return json({ player: existing, banned: true, reason: last ? last.reason : "" });
       return json({ error: "banned", reason: last ? last.reason : "" }, 403);
     }
-    if (body.action === "me") { if (existing) await saveDevices(); return json({ player: existing }); }
+    // Squad Up badge: friends who joined from your invite link. A friend counts once they've done 3 sessions,
+    // isn't banned and doesn't share a Peak or phone with you. 3 friends puts "squad" in your awards for good
+    const INVITES_NEEDED = 3;
+    const invites = async () => {
+      const { data: kids } = await sb.from("players").select("id,stats,banned").eq("referred_by", id).limit(200);
+      if (!kids || !kids.length) return { done: 0, joined: 0 };
+      const { data: mine } = await sb.from("devices").select("serial").eq("player", id);
+      const ser = new Set((mine || []).map((x: { serial: string }) => x.serial));
+      const { data: theirs } = await sb.from("devices").select("player,serial").in("player", kids.map((k: { id: string }) => k.id));
+      const shared = new Set((theirs || []).filter((x: { serial: string }) => ser.has(x.serial)).map((x: { player: string }) => x.player));
+      const real = kids.filter((k: { id: string; banned: boolean }) => !k.banned && !shared.has(k.id));
+      return { done: real.filter((k: { stats: { sessions?: number } | null }) => Number(k.stats && k.stats.sessions) >= 3).length, joined: real.length };
+    };
+    const withInvites = async (p: Record<string, unknown> | null) => {
+      if (!p) return p;
+      const inv = await invites(), aw: string[] = Array.isArray(p.awards) ? p.awards as string[] : [];
+      if (inv.done >= INVITES_NEEDED && !aw.includes("squad")) {
+        const next = [...aw, "squad"]; await sb.from("players").update({ awards: next }).eq("id", id); p.awards = next;
+      }
+      return { ...p, invites: inv.done, invites_joined: inv.joined };
+    };
+
+    if (body.action === "me") { if (existing) await saveDevices(); return json({ player: await withInvites(existing) }); }
 
 
     // Social: follow / unfollow another player (you need a profile first)
@@ -149,7 +171,7 @@ Deno.serve(async (req) => {
     const awards: string[] = existing && Array.isArray(existing.awards) ? existing.awards : [];
     const joined = existing && existing.created_at ? new Date(existing.created_at).getTime() : Date.now();
     const handedOut = (k: string) => {
-      if (["sp:bughunter", "sp:discord", "sp:podium"].includes(k)) return awards.includes(k.slice(3));
+      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:squad"].includes(k)) return awards.includes(k.slice(3));
       if (k === "sp:founder") return joined < Date.parse("2026-11-01T00:00:00Z");
       return true;
     };
@@ -163,6 +185,14 @@ Deno.serve(async (req) => {
     if (Array.isArray(body.gear)) {
       // devices you own, shown on your profile: "peak", "peak:<edition>" or "proxy"
       row.gear = [...new Set(body.gear.filter((k: unknown) => typeof k === "string" && /^(peak|proxy)(:[A-Za-z0-9 ]{1,24})?$/.test(k)))].slice(0, 6);
+    }
+    // invite link: who sent you. Only when the profile is new (or under 7 days old) and nobody is set yet
+    if (typeof body.ref === "string" && /^[A-Za-z0-9_.]{3,32}$/.test(body.ref) && (!existing || (!existing.referred_by && Date.now() - joined < 7 * 86400000))) {
+      const r = body.ref;
+      const { data: who } = /^[0-9a-f]{32}$/.test(r)
+        ? await sb.from("players").select("id,referred_by").eq("id", r).maybeSingle()
+        : await sb.from("players").select("id,referred_by").ilike("username", r.replace(/[_%\\]/g, "\\$&")).maybeSingle(); // _ is a wildcard in ilike
+      if (who && who.id !== id && who.referred_by !== id) row.referred_by = who.id; // not yourself, and no inviting each other
     }
     if (typeof body.bio === "string") row.bio = body.bio.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 160);
     if (body.stats && typeof body.stats === "object") {
@@ -185,7 +215,7 @@ Deno.serve(async (req) => {
     if (error) return json({ error: error.message }, 500);
     await saveDevices();
 
-    return json({ player: data });
+    return json({ player: await withInvites(data) });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
