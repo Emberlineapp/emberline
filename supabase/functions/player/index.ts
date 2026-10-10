@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
       if (up.error) return json({ error: "avatar_upload" }, 500);
       row.avatar_url = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?v=" + Date.now();
     }
-    const tierFor = (rp: number) => rp >= 500 ? "Champion" : rp >= 300 ? "Inferno" : rp >= 150 ? "Blaze" : rp >= 50 ? "Flame" : "Ember";
+    const tierFor = (rp: number) => rp >= 5000 ? "Legend" : rp >= 500 ? "Champion" : rp >= 300 ? "Inferno" : rp >= 150 ? "Blaze" : rp >= 50 ? "Flame" : "Ember";
     const n = (v: unknown) => Math.max(0, Math.min(100000, Math.round(Number(v))));
     // RP can't crash within the same month (a new phone or computer has no local sessions and would send 0)
     const sameMonth = existing && typeof body.month === "string" && existing.month === body.month;
@@ -176,9 +176,9 @@ Deno.serve(async (req) => {
       return true;
     };
     if (Array.isArray(body.showcase)) {
-      // up to 3 badges: "dev" (only if you have it) or "YYYY-MM:<tier 0-4>" or "YYYY-MM:now"
+      // up to 3 badges: "dev" (only if you have it) or "YYYY-MM:<tier 0-5>" or "YYYY-MM:now"
       const ok = body.showcase.filter((k: unknown) => typeof k === "string" &&
-        (k === "dev" ? !!(existing && existing.dev) : /^\d{4}-\d{2}:(?:[0-4]|now)$/.test(k) || /^sp:[a-z0-9]{2,16}$/.test(k)) && handedOut(k));
+        (k === "dev" ? !!(existing && existing.dev) : /^\d{4}-\d{2}:(?:[0-5]|now)$/.test(k) || /^sp:[a-z0-9]{2,16}$/.test(k)) && handedOut(k));
       row.showcase = [...new Set(ok)].slice(0, 3);
     }
     if (typeof body.month === "string" && /^\d{4}-\d{2}$/.test(body.month)) row.month = body.month;
