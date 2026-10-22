@@ -3164,15 +3164,21 @@ function hitSample(v, now){
   const up = Math.max(.12, HIT.base + .1), down = Math.max(.06, HIT.base + .04);
   // Ready just started: wait until the sensor reads quiet once before timing. Otherwise a reading left over from
   // preheat (the Proxy holds and slowly fades its last value) counts as a long fake hit
-  if (S.state === 8 && HIT.lastSt !== 8){ HIT.armed = HIT.mode === 'heat'; HIT.quiet = 0; HIT.readyT = now; HIT.rmin = HIT.rmax = HIT.still = null; }
+  // remember the last few preheat readings: if they were low, whatever reads high at Ready is a real pull
+  if (S.state === 7){ (HIT.pre = HIT.pre || []).push(v); if (HIT.pre.length > 6) HIT.pre.shift(); }
+  if (S.state === 8 && HIT.lastSt !== 8){ HIT.armed = HIT.mode === 'heat'; HIT.quiet = 0; HIT.readyT = now; HIT.rmin = HIT.rmax = HIT.still = null;
+    const pre = (HIT.pre || []).slice(-3); HIT.preHigh = pre.length ? Math.max(...pre) >= up : null; HIT.pre = []; }
   HIT.lastSt = S.state;
   if (S.state === 8 && !HIT.armed){
-    if (v < down){ if (++HIT.quiet >= 2) HIT.armed = true; } // quiet: nobody's pulling, start timing from here
+    if (v < down){ if (++HIT.quiet >= 1) HIT.armed = true; } // quiet: nobody's pulling, start timing from here
+    else if (HIT.preHigh === false && v >= up){ // low all through preheat, high now: a real pull that started at Ready, so count it right away
+      HIT.armed = true; HIT.on = true; HIT.start = Math.max(HIT.readyT + HIT_DELAY, now + HIT_DELAY); HIT.peak = v; HIT.party = false; buzz(15); if (!hitRaf) hitRaf = requestAnimationFrame(hitTick);
+    }
     else {
       HIT.quiet = 0; HIT.rmin = Math.min(HIT.rmin ?? v, v); HIT.rmax = Math.max(HIT.rmax ?? v, v);
-      // Peak: never quiet after 2.5s of Ready. A reading that moves is someone who started pulling before Ready (time it
+      // Peak: never quiet after 1s of Ready. A reading that moves is someone who started pulling before Ready (time it
       // from Ready); one that sits still is left over from preheat (the Ready light), so treat that level as resting
-      if (!isProxy() && now - HIT.readyT > 2500){
+      if (!isProxy() && now - HIT.readyT > 1000){
         if (HIT.still == null && HIT.rmax - HIT.rmin > .06 && v >= up){ HIT.armed = true; HIT.on = true; HIT.start = HIT.readyT; HIT.peak = v; HIT.party = false; if (!hitRaf) hitRaf = requestAnimationFrame(hitTick); }
         else if (HIT.still == null) HIT.still = HIT.rmax; // left over: wait until it goes quiet, or a real pull lifts it clearly above this level
         else if (v > HIT.still + .12){ HIT.armed = true; HIT.on = true; HIT.start = now + HIT_DELAY; HIT.peak = v; HIT.party = false; buzz(15); if (!hitRaf) hitRaf = requestAnimationFrame(hitTick); }
