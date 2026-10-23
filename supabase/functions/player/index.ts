@@ -198,12 +198,12 @@ Deno.serve(async (req) => {
     if (body.stats && typeof body.stats === "object") {
       // profile stats from the app (tap a name to see them): only these numbers, kept in a sane range
       const st: Record<string, number> = {};
-      for (const k of ["sessions", "hits", "days", "blAll"]) { const v = Number(body.stats[k]); if (Number.isFinite(v)) st[k] = Math.max(0, Math.min(100000, Math.round(v))); }
+      for (const k of ["sessions", "hits", "days", "blAll", "dw", "dl", "dd"]) { const v = Number(body.stats[k]); if (Number.isFinite(v)) st[k] = Math.max(0, Math.min(100000, Math.round(v))); } // dw/dl/dd: 1v1 wins, losses, draws (all time)
       { const v = Number(body.stats.best); if (Number.isFinite(v)) st.best = Math.max(0, Math.min(120, Math.round(v * 10) / 10)); }
       // several devices on one account: never let a phone or tablet with less history lower the numbers.
       // All-time blinkers always keep the highest; this month's numbers keep the highest within the same month
       const old = existing && existing.stats && typeof existing.stats === "object" ? existing.stats : {};
-      if (Number(old.blAll) > (st.blAll ?? 0)) st.blAll = Number(old.blAll);
+      for (const k of ["blAll", "dw", "dl", "dd"]) if (Number(old[k]) > (st[k] ?? 0)) st[k] = Number(old[k]);
       if (sameMonth) for (const k of ["sessions", "hits", "days", "best"]) if (Number(old[k]) > (st[k] ?? 0)) st[k] = Number(old[k]);
       row.stats = st;
     }
