@@ -242,6 +242,8 @@ section.view>*{min-width:0}
 .prem-star{display:inline-block;vertical-align:middle;flex:none;cursor:pointer;filter:drop-shadow(0 0 4px #ffd23f88)}
 .prem-bnrs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.prem-bnr{height:44px;border:0;border-radius:10px;position:relative;cursor:pointer;box-shadow:inset 0 0 0 1px #fff2}.prem-bnr span{position:absolute;left:6px;bottom:3px;font:700 11px var(--f-round,system-ui);color:#fff;text-shadow:0 1px 4px #000c}.prem-bnr.on{box-shadow:0 0 0 2px var(--fg),inset 0 0 0 1px #fff4}
 .dbl-big{font:900 64px/1 var(--f-round,system-ui);background:linear-gradient(120deg,#ff2200,#ff9900,#ffd23f);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 18px #ff990088)}
+.dbl-note{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 8px);z-index:300;display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:18px;background:linear-gradient(120deg,#ff2200,#ff9900 60%,#ffd23f);color:#1d0a00;box-shadow:0 10px 30px #0008;transform:translateY(-140%);transition:transform .45s cubic-bezier(.2,.9,.3,1.2);cursor:pointer;max-width:520px;margin:0 auto}
+.dbl-note.on{transform:none}.dbl-note>b{font-size:26px}.dbl-note span{display:grid;gap:1px;min-width:0}.dbl-note span b{font:800 15px var(--f-round,system-ui)}.dbl-note small{font-size:12.5px;font-weight:600}
 .dbl-rp{display:grid;gap:2px;padding:10px 12px;border-radius:14px;background:linear-gradient(120deg,#ff2200,#ff9900 55%,#ffd23f);color:#1d0a00;cursor:pointer;animation:dblGlow 2.4s ease-in-out infinite}.dbl-rp b{font:800 16px var(--f-round,system-ui)}.dbl-rp span{font-size:13px;font-weight:600}
 @keyframes dblGlow{0%,100%{box-shadow:0 0 0 0 #ff990000}50%{box-shadow:0 0 22px 2px #ff9900aa}}
 .has-bnr{position:relative;overflow:hidden}.has-bnr>*:not(.bnr){position:relative;z-index:1}
@@ -7979,7 +7981,18 @@ function dblPop(force){
   const opened = Date.now(); el.querySelector('#dblGo').addEventListener('click', () => { if (Date.now() - opened < 400) return; el.classList.remove('on'); setTimeout(() => el.remove(), 260); });
 }
 (function dblWait(n){ if (!dblNow() || n > 60) return; const busy = greetOpen || document.getElementById('spl') || document.querySelector('.egg') || [...document.querySelectorAll('.welcome, #welcome')].some(w => !w.hidden && getComputedStyle(w).display !== 'none' && w.childElementCount > 0);
-  if (busy || store.wnSeen !== WN_VER) setTimeout(() => dblWait(n + 1), 1500); else dblPop(); })(0);
+  if (busy || store.wnSeen !== WN_VER) setTimeout(() => dblWait(n + 1), 1500); else if (store.dblSeen !== dblNow().id) dblPop(); else dblNote(); })(0);
+// a notification banner every time you open the app while Double RP is on (the big popup only shows once)
+function dblNote(){
+  const e = dblNow(); if (!e || document.getElementById('dblNote')) return;
+  const el = document.createElement('div'); el.id = 'dblNote'; el.className = 'dbl-note'; el.setAttribute('role', 'status');
+  el.innerHTML = `<b>🔥</b><span><b>Double RP is live</b><small>Sessions and blinkers count 2x until ${new Date(e.to).toLocaleString([], { weekday:'short', hour:'numeric', minute:'2-digit' })}</small></span>`;
+  document.body.appendChild(el); buzz([30, 40, 30]);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  const hide = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 400); };
+  el.onclick = () => { hide(); dblPop(true); };
+  setTimeout(hide, 6000);
+}
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-dbl]')) dblPop(true); });
 setInterval(() => { if (DOUBLE_RP.some(e => Math.abs(Date.now() - e.to) < 61000 || Math.abs(Date.now() - e.from) < 61000)) try { drawRank(); } catch(_){} }, 60000); // the banner comes and goes on time
 // wait until the welcome and any other popup are gone, then show it
