@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
     const awards: string[] = existing && Array.isArray(existing.awards) ? existing.awards : [];
     const joined = existing && existing.created_at ? new Date(existing.created_at).getTime() : Date.now();
     const handedOut = (k: string) => {
-      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:squad"].includes(k)) return awards.includes(k.slice(3));
+      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:squad", "sp:premium"].includes(k)) return awards.includes(k.slice(3));
       if (k === "sp:founder") return joined < Date.parse("2026-11-01T00:00:00Z");
       return true;
     };
@@ -194,6 +194,8 @@ Deno.serve(async (req) => {
         : await sb.from("players").select("id,referred_by").ilike("username", r.replace(/[_%\\]/g, "\\$&")).maybeSingle(); // _ is a wildcard in ilike
       if (who && who.id !== id && who.referred_by !== id) row.referred_by = who.id; // not yourself, and no inviting each other
     }
+    // Premium (awards has "premium", added by hand after a Discord ticket): a profile banner from the app's list
+    if (typeof body.banner === "string" && /^[a-z]{2,12}$/.test(body.banner) && awards.includes("premium")) row.banner = body.banner;
     if (typeof body.bio === "string") row.bio = body.bio.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 160);
     if (body.stats && typeof body.stats === "object") {
       // profile stats from the app (tap a name to see them): only these numbers, kept in a sane range
