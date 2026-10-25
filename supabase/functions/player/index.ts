@@ -143,9 +143,9 @@ Deno.serve(async (req) => {
 
     if (typeof body.avatar === "string" && body.avatar.startsWith("data:image/jpeg;base64,")) {
       const bytes = Uint8Array.from(atob(body.avatar.split(",")[1]), (c) => c.charCodeAt(0));
-      if (bytes.length > 400000) return json({ error: "avatar_too_big" }, 400);
+      if (bytes.length > 60000) return json({ error: "avatar_too_big" }, 400); // the app sends 160px pictures (about 10 KB)
       const path = id + ".jpg";
-      const up = await sb.storage.from("avatars").upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+      const up = await sb.storage.from("avatars").upload(path, bytes, { contentType: "image/jpeg", upsert: true, cacheControl: "31536000" }) // phones keep it a year (the URL changes with ?v= on every new picture), so it isn't downloaded again;
       if (up.error) return json({ error: "avatar_upload" }, 500);
       row.avatar_url = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?v=" + Date.now();
     }
