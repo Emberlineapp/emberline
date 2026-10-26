@@ -169,9 +169,12 @@ Deno.serve(async (req) => {
     if (Number.isFinite(Number(body.blinkers))) { const v = n(body.blinkers); if (!(sameMonth && v < (existing.blinkers || 0))) row.blinkers = v; }
     // badges only the dev hands out (players.awards), and Founder (joined in October 2026), can't be claimed by the app
     const awards: string[] = existing && Array.isArray(existing.awards) ? existing.awards : [];
+    // Premium: "premium" (no end) or "premium:YYYY-MM-DD" (through that day)
+    const premium = awards.some((a) => a === "premium" || (/^premium:\d{4}-\d{2}-\d{2}$/.test(a) && a.slice(8) >= new Date().toISOString().slice(0, 10)));
     const joined = existing && existing.created_at ? new Date(existing.created_at).getTime() : Date.now();
     const handedOut = (k: string) => {
-      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:squad", "sp:premium"].includes(k)) return awards.includes(k.slice(3));
+      if (k === "sp:premium") return premium;
+      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:squad"].includes(k)) return awards.includes(k.slice(3));
       if (k === "sp:founder") return joined < Date.parse("2026-11-01T00:00:00Z");
       return true;
     };
@@ -195,11 +198,11 @@ Deno.serve(async (req) => {
       if (who && who.id !== id && who.referred_by !== id) row.referred_by = who.id; // not yourself, and no inviting each other
     }
     // Premium (awards has "premium", added by hand after a Discord ticket): a profile banner from the app's list
-    if (typeof body.banner === "string" && /^[a-z]{2,12}$/.test(body.banner) && awards.includes("premium")) row.banner = body.banner;
+    if (typeof body.banner === "string" && /^[a-z]{2,12}$/.test(body.banner) && premium) row.banner = body.banner;
     // or their own picture (the app crops it to 720x220, about 40 KB). Kept next to the profile pictures
     // a GIF comes as it is (up to 1.5 MB) so it keeps moving
     const bm = typeof body.bannerImg === "string" ? /^data:image\/(jpeg|gif);base64,/.exec(body.bannerImg) : null;
-    if (bm && awards.includes("premium")) {
+    if (bm && premium) {
       const gif = bm[1] === "gif", bytes = Uint8Array.from(atob(body.bannerImg.split(",")[1]), (c) => c.charCodeAt(0));
       if (bytes.length > (gif ? 1600000 : 150000)) return json({ error: "banner_too_big" }, 400);
       if (gif && !(bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46)) return json({ error: "banner_not_gif" }, 400); // starts with "GIF"
