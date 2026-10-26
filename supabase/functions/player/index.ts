@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
       else if (sameMonth && lockedUntil > now) { /* locked out of ranked */ }
       else if (v - dayBase > DAY_MAX) { row.locked_until = new Date(now + LOCK_MS).toISOString(); row.rp_day = today; row.rp_day_base = dayBase; } // every push, including a new account's first one and the first of a month
       else { row.rp = v; row.rp_day = today; row.rp_day_base = dayBase; row.tier = tierFor(v); } // tier comes from the RP we accepted, not from the app
-    } else if (!sameMonth) row.tier = tierFor(0);
+    } else if (!existing || (typeof body.month === "string" && existing.month !== body.month)) row.tier = tierFor(0); // a new month only. A save with no month (picture, bio) must not reset the tier
     if (Number.isFinite(Number(body.blinkers))) { const v = n(body.blinkers); if (!(sameMonth && v < (existing.blinkers || 0))) row.blinkers = v; }
     // badges only the dev hands out (players.awards), and Founder (joined in October 2026), can't be claimed by the app
     const awards: string[] = existing && Array.isArray(existing.awards) ? existing.awards : [];
