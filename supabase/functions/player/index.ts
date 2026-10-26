@@ -197,11 +197,14 @@ Deno.serve(async (req) => {
     // Premium (awards has "premium", added by hand after a Discord ticket): a profile banner from the app's list
     if (typeof body.banner === "string" && /^[a-z]{2,12}$/.test(body.banner) && awards.includes("premium")) row.banner = body.banner;
     // or their own picture (the app crops it to 720x220, about 40 KB). Kept next to the profile pictures
-    if (typeof body.bannerImg === "string" && body.bannerImg.startsWith("data:image/jpeg;base64,") && awards.includes("premium")) {
-      const bytes = Uint8Array.from(atob(body.bannerImg.split(",")[1]), (c) => c.charCodeAt(0));
-      if (bytes.length > 150000) return json({ error: "banner_too_big" }, 400);
-      const path = id + "-banner.jpg";
-      const up = await sb.storage.from("avatars").upload(path, bytes, { contentType: "image/jpeg", upsert: true, cacheControl: "31536000" });
+    // a GIF comes as it is (up to 1.5 MB) so it keeps moving
+    const bm = typeof body.bannerImg === "string" ? /^data:image\/(jpeg|gif);base64,/.exec(body.bannerImg) : null;
+    if (bm && awards.includes("premium")) {
+      const gif = bm[1] === "gif", bytes = Uint8Array.from(atob(body.bannerImg.split(",")[1]), (c) => c.charCodeAt(0));
+      if (bytes.length > (gif ? 1600000 : 150000)) return json({ error: "banner_too_big" }, 400);
+      if (gif && !(bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46)) return json({ error: "banner_not_gif" }, 400); // starts with "GIF"
+      const path = id + "-banner." + (gif ? "gif" : "jpg");
+      const up = await sb.storage.from("avatars").upload(path, bytes, { contentType: gif ? "image/gif" : "image/jpeg", upsert: true, cacheControl: "31536000" });
       if (up.error) return json({ error: "banner_upload" }, 500);
       row.banner = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?v=" + Date.now();
     }
