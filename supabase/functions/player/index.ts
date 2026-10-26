@@ -196,6 +196,15 @@ Deno.serve(async (req) => {
     }
     // Premium (awards has "premium", added by hand after a Discord ticket): a profile banner from the app's list
     if (typeof body.banner === "string" && /^[a-z]{2,12}$/.test(body.banner) && awards.includes("premium")) row.banner = body.banner;
+    // or their own picture (the app crops it to 720x220, about 40 KB). Kept next to the profile pictures
+    if (typeof body.bannerImg === "string" && body.bannerImg.startsWith("data:image/jpeg;base64,") && awards.includes("premium")) {
+      const bytes = Uint8Array.from(atob(body.bannerImg.split(",")[1]), (c) => c.charCodeAt(0));
+      if (bytes.length > 150000) return json({ error: "banner_too_big" }, 400);
+      const path = id + "-banner.jpg";
+      const up = await sb.storage.from("avatars").upload(path, bytes, { contentType: "image/jpeg", upsert: true, cacheControl: "31536000" });
+      if (up.error) return json({ error: "banner_upload" }, 500);
+      row.banner = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?v=" + Date.now();
+    }
     if (typeof body.bio === "string") row.bio = body.bio.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 160);
     if (body.stats && typeof body.stats === "object") {
       // profile stats from the app (tap a name to see them): only these numbers, kept in a sane range
