@@ -21,6 +21,51 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+    // ---- phone alerts (web push). The keys are made here the first time and kept in app_kv, so there's nothing to set up ----
+    // loaded only when needed, so if it ever fails only alerts break (ranked, profiles and follows keep working)
+    // deno-lint-ignore no-explicit-any
+    const wp = async (): Promise<any> => (await import("npm:web-push@3.6.7")).default;
+    const vapid = async () => {
+      const { data } = await sb.from("app_kv").select("value").eq("key", "vapid").maybeSingle();
+      if (data && data.value && data.value.publicKey) return data.value as { publicKey: string; privateKey: string };
+      const k = (await wp()).generateVAPIDKeys(); await sb.from("app_kv").upsert({ key: "vapid", value: k }); return k;
+    };
+    const pushTo = async (subs: { endpoint: string; sub: unknown }[], payload: Record<string, unknown>) => {
+      if (!subs.length) return 0;
+      try {
+        const webpush = await wp(), k = await vapid(); webpush.setVapidDetails("https://emberlineapp.github.io/emberline/", k.publicKey, k.privateKey);
+        let n = 0;
+        for (const s of subs) {
+          try { await webpush.sendNotification(s.sub as any, JSON.stringify(payload), { TTL: 900, urgency: "high" }); n++; }
+          catch (e) { const c = (e as { statusCode?: number }).statusCode; if (c === 404 || c === 410) await sb.from("push_subs").delete().eq("endpoint", s.endpoint); } // that phone turned alerts off
+        }
+        return n;
+      } catch (_) { return 0; } // push is extra: a failure never breaks the invite or follow
+    };
+    const pushPlayer = async (player: string, payload: Record<string, unknown>) => {
+      const { data: subs } = await sb.from("push_subs").select("endpoint,sub").eq("player", player).limit(5);
+      return pushTo(subs || [], payload);
+    };
+    // the Alerts app (Safari, Home Screen) has no Puffco login: it gets the key, then pairs with a 6-character code from Emberline
+    if (body.action === "push_key") return json({ key: (await vapid()).publicKey });
+    if (body.action === "push_pair") {
+      const code = String(body.code || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), sub = body.sub;
+      if (code.length !== 6 || !sub || typeof sub.endpoint !== "string" || !/^https:\/\//.test(sub.endpoint) || !sub.keys) return json({ error: "bad_code" }, 400);
+      const { data: link } = await sb.from("push_links").select("player,until").eq("code", code).maybeSingle();
+      if (!link || new Date(link.until).getTime() < Date.now()) return json({ error: "bad_code" }, 400);
+      await sb.from("push_subs").upsert({ endpoint: sub.endpoint, player: link.player, sub });
+      await sb.from("push_links").delete().eq("code", code);
+      const { data: p } = await sb.from("players").select("username").eq("id", link.player).maybeSingle();
+      await pushTo([{ endpoint: sub.endpoint, sub }], { title: "Emberline alerts are on 🔥", body: "1v1 invites and new followers will show up here." });
+      return json({ ok: true, username: p ? p.username : null });
+    }
+    if (body.action === "push_test") {
+      const ep = typeof body.endpoint === "string" ? body.endpoint : "";
+      const { data: s } = await sb.from("push_subs").select("endpoint,sub").eq("endpoint", ep).maybeSingle();
+      if (!s) return json({ error: "not_paired" }, 404);
+      return json({ ok: true, sent: await pushTo([s], { title: "Test from Emberline", body: "Phone alerts work. 🔥" }) });
+    }
+
     // who is this? Ranked only works with a Puffco login, checked with Puffco's server
     let key = "", verified = false;
     if (typeof body.puffcoToken === "string" && body.puffcoToken) {
@@ -99,6 +144,44 @@ Deno.serve(async (req) => {
 
     if (body.action === "me") { if (existing) await saveDevices(); return json({ player: await withInvites(existing) }); }
 
+    // ---- notifications: an inbox in the app, plus a push to the phone when Alerts are on ----
+    const notify = async (player: string, kind: string, data: Record<string, unknown>, title: string, text: string) => {
+      await sb.from("notes").insert({ player, kind, from_id: id, from_name: existing ? existing.username : null, data });
+      return pushPlayer(player, { title, body: text, kind, data: { ...data, from: id, n: existing ? existing.username : null } });
+    };
+    if (body.action === "notes") {
+      const { data: list } = await sb.from("notes").select("id,kind,from_id,from_name,data,read,created_at").eq("player", id).order("created_at", { ascending: false }).limit(30);
+      const unread = (list || []).filter((x: { read: boolean }) => !x.read).length;
+      if (body.read && unread) await sb.from("notes").update({ read: true }).eq("player", id).eq("read", false);
+      const { count } = await sb.from("push_subs").select("endpoint", { count: "exact", head: true }).eq("player", id);
+      return json({ notes: list || [], unread, phones: count || 0 });
+    }
+    if (body.action === "push_link") {
+      if (!existing) return json({ error: "username_required" }, 400);
+      const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", r = crypto.getRandomValues(new Uint8Array(6));
+      const code = Array.from(r, (b) => A[b % A.length]).join("");
+      await sb.from("push_links").delete().eq("player", id);
+      await sb.from("push_links").insert({ code, player: id, until: new Date(Date.now() + 15 * 60000).toISOString() });
+      return json({ code });
+    }
+    if (body.action === "push_off") { await sb.from("push_subs").delete().eq("player", id); return json({ ok: true }); }
+    if (body.action === "push_me") return json({ ok: true, sent: await pushPlayer(id, { title: "Test from Emberline", body: "Phone alerts work. 🔥" }) });
+    // a 1v1 invite to a friend (you follow each other). The live invite still goes over the lobby; this reaches them when the app is closed
+    if (body.action === "invite") {
+      if (!existing) return json({ error: "username_required" }, 400);
+      const target = typeof body.target === "string" ? body.target : "", code = String(body.code || "").toUpperCase();
+      if (!/^[0-9a-f]{32}$/.test(target) || target === id || !/^[A-Z0-9]{6}$/.test(code)) return json({ error: "bad_target" }, 400);
+      const [{ data: a }, { data: b }] = await Promise.all([
+        sb.from("follows").select("follower").eq("follower", id).eq("followee", target).maybeSingle(),
+        sb.from("follows").select("follower").eq("follower", target).eq("followee", id).maybeSingle()]);
+      if (!a || !b) return json({ error: "not_friends" }, 403);
+      const { data: last } = await sb.from("notes").select("created_at").eq("player", target).eq("from_id", id).eq("kind", "invite").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (last && Date.now() - new Date(last.created_at).getTime() < 30000) return json({ ok: true, skipped: true }); // no spamming
+      const bet = Math.max(0, Math.min(100, Math.round(Number(body.bet) || 0)));
+      const sent = await notify(target, "invite", { code, bet, rules: body.rules && typeof body.rules === "object" ? body.rules : null }, `🔥 ${existing.username} wants to 1v1`, bet ? `Bet: ${bet} RP. Open Emberline to accept` : "Open Emberline to accept");
+      return json({ ok: true, pushed: sent });
+    }
+
 
     // Social: follow / unfollow another player (you need a profile first)
     if (body.action === "follow" || body.action === "unfollow") {
@@ -110,6 +193,13 @@ Deno.serve(async (req) => {
         if (!t) return json({ error: "bad_target" }, 404);
         const { error } = await sb.from("follows").upsert({ follower: id, followee: target });
         if (error) return json({ error: error.message }, 500);
+        // tell them (once a day per follower, so follow / unfollow / follow doesn't spam)
+        const { data: last } = await sb.from("notes").select("created_at").eq("player", target).eq("from_id", id).eq("kind", "follow").order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (!last || Date.now() - new Date(last.created_at).getTime() > 86400000) {
+          const notify1 = async () => { await sb.from("notes").insert({ player: target, kind: "follow", from_id: id, from_name: existing.username, data: {} });
+            await pushPlayer(target, { title: `${existing.username} followed you`, body: "Tap to see their profile in Emberline", kind: "follow", data: { from: id, n: existing.username } }); };
+          await notify1();
+        }
       } else {
         const { error } = await sb.from("follows").delete().eq("follower", id).eq("followee", target);
         if (error) return json({ error: error.message }, 500);
