@@ -48,6 +48,26 @@ Deno.serve(async (req) => {
     };
     // the Alerts app (Safari, Home Screen) has no Puffco login: it gets the key, then pairs with a 6-character code from Emberline
     if (body.action === "push_key") return json({ key: (await vapid()).publicKey });
+
+    // colorway hunt (colorway.html): an owner of an edition we still need shared its lights. Bug Hunter for that username, once per shared device
+    if (body.action === "edition_claim") {
+      const WANTED = ["Storm", "Glacier"];
+      const hash = String(body.hash || ""), name = String(body.username || "").trim();
+      if (!/^[0-9a-f]{64}$/.test(hash) || !name || name.length > 32) return json({ error: "bad_request" }, 400);
+      const { data: row } = await sb.from("edition_lights").select("edition, files").eq("hash", hash).maybeSingle();
+      if (!row || !WANTED.includes(row.edition)) return json({ error: "not_wanted" }, 404);
+      const nf = row.files && typeof row.files === "object" ? Object.keys(row.files).filter((k) => /\/colr$/.test(k)).length : 0;
+      if (nf < 5) return json({ error: "not_wanted" }, 404); // a real Peak Pro has all six light slots
+      const key = "edclaim:" + hash;
+      const { data: used } = await sb.from("app_kv").select("value").eq("key", key).maybeSingle();
+      if (used) return json({ error: "already_claimed", username: (used.value as { username?: string })?.username }, 409);
+      const { data: p } = await sb.from("players").select("id, username, awards").ilike("username", name.replace(/[\\%_]/g, "\\$&")).maybeSingle();
+      if (!p) return json({ error: "no_player" }, 404);
+      const aw: string[] = Array.isArray(p.awards) ? p.awards as string[] : [], had = aw.includes("bughunter");
+      if (!had) { const { error } = await sb.from("players").update({ awards: [...aw, "bughunter"] }).eq("id", p.id); if (error) throw error; }
+      await sb.from("app_kv").upsert({ key, value: { username: p.username, edition: row.edition, at: new Date().toISOString() } });
+      return json({ ok: true, username: p.username, had });
+    }
     if (body.action === "push_pair") {
       const code = String(body.code || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), sub = body.sub;
       if (code.length !== 6 || !sub || typeof sub.endpoint !== "string" || !/^https:\/\//.test(sub.endpoint) || !sub.keys) return json({ error: "bad_code" }, 400);
