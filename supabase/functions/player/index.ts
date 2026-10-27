@@ -30,17 +30,20 @@ Deno.serve(async (req) => {
       if (data && data.value && data.value.publicKey) return data.value as { publicKey: string; privateKey: string };
       const k = (await wp()).generateVAPIDKeys(); await sb.from("app_kv").upsert({ key: "vapid", value: k }); return k;
     };
+    let pushErr = ""; // the last send error, so the app can show why
     const pushTo = async (subs: { endpoint: string; sub: unknown }[], payload: Record<string, unknown>) => {
       if (!subs.length) return 0;
+      // also in Apple's "declarative web push" shape: Path (iPhone) has no service worker to read our own fields
+      const msg = JSON.stringify({ ...payload, web_push: 8030, notification: { title: payload.title, body: payload.body, navigate: (payload.url as string) || "https://emberlineapp.github.io/emberline/" } });
       try {
         const webpush = await wp(), k = await vapid(); webpush.setVapidDetails("https://emberlineapp.github.io/emberline/", k.publicKey, k.privateKey);
         let n = 0;
         for (const s of subs) {
-          try { await webpush.sendNotification(s.sub as any, JSON.stringify(payload), { TTL: 900, urgency: "high" }); n++; }
-          catch (e) { const c = (e as { statusCode?: number }).statusCode; if (c === 404 || c === 410) await sb.from("push_subs").delete().eq("endpoint", s.endpoint); } // that phone turned alerts off
+          try { await webpush.sendNotification(s.sub as any, msg, { TTL: 900, urgency: "high" }); n++; }
+          catch (e) { const c = (e as { statusCode?: number; body?: string }).statusCode; pushErr = String(c || "") + " " + String((e as { body?: string }).body || (e as Error).message || e).slice(0, 200); if (c === 404 || c === 410) await sb.from("push_subs").delete().eq("endpoint", s.endpoint); } // that phone turned alerts off
         }
         return n;
-      } catch (_) { return 0; } // push is extra: a failure never breaks the invite or follow
+      } catch (e) { pushErr = String((e as Error).message || e).slice(0, 200); return 0; } // push is extra: a failure never breaks the invite or follow
     };
     const pushPlayer = async (player: string, payload: Record<string, unknown>) => {
       const { data: subs } = await sb.from("push_subs").select("endpoint,sub").eq("player", player).limit(5);
@@ -189,10 +192,11 @@ Deno.serve(async (req) => {
       const sub = body.sub;
       if (!sub || typeof sub.endpoint !== "string" || !/^https:\/\//.test(sub.endpoint) || !sub.keys) return json({ error: "bad_sub" }, 400);
       await sb.from("push_subs").upsert({ endpoint: sub.endpoint, player: id, sub });
-      return json({ ok: true, sent: await pushTo([{ endpoint: sub.endpoint, sub }], { title: "Emberline notifications are on 🔥", body: "1v1 invites and new followers will show up here." }) });
+      const sent = await pushTo([{ endpoint: sub.endpoint, sub }], { title: "Emberline notifications are on 🔥", body: "1v1 invites and new followers will show up here." });
+      return json({ ok: true, sent, err: sent ? undefined : pushErr });
     }
     if (body.action === "push_off") { await sb.from("push_subs").delete().eq("player", id); return json({ ok: true }); }
-    if (body.action === "push_me") return json({ ok: true, sent: await pushPlayer(id, { title: "Test from Emberline", body: "Phone alerts work. 🔥" }) });
+    if (body.action === "push_me") { const sent = await pushPlayer(id, { title: "Test from Emberline", body: "Phone alerts work. 🔥" }); return json({ ok: true, sent, err: sent ? undefined : pushErr }); }
     // a 1v1 invite to a friend (you follow each other). The live invite still goes over the lobby; this reaches them when the app is closed
     if (body.action === "invite") {
       if (!existing) return json({ error: "username_required" }, 400);
