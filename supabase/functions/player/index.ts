@@ -49,13 +49,13 @@ Deno.serve(async (req) => {
     // the Alerts app (Safari, Home Screen) has no Puffco login: it gets the key, then pairs with a 6-character code from Emberline
     if (body.action === "push_key") return json({ key: (await vapid()).publicKey });
 
-    // colorway hunt (colorway.html): an owner of an edition we still need shared its lights. Bug Hunter for that username, once per shared device
+    // Limited Edition Testing (limited.html): an owner of a special edition shared its lights. Bug Hunter for that username, once per shared device
     if (body.action === "edition_claim") {
-      const WANTED = ["Storm", "Glacier"];
+      const WANTED = ["Opal", "Indiglow", "Guardian", "Desert", "Flourish", "Storm", "Daybreak", "Plasma", "Glacier", "Haze", "Pine"]; // keep in step with limited.html
       const hash = String(body.hash || ""), name = String(body.username || "").trim();
       if (!/^[0-9a-f]{64}$/.test(hash) || !name || name.length > 32) return json({ error: "bad_request" }, 400);
       const { data: row } = await sb.from("edition_lights").select("edition, files").eq("hash", hash).maybeSingle();
-      if (!row || !WANTED.includes(row.edition)) return json({ error: "not_wanted" }, 404);
+      if (!row || !(WANTED.includes(row.edition) || /^Proxy \d+$/.test(row.edition))) return json({ error: "not_wanted" }, 404); // "Proxy <code>": a Proxy edition we don't know yet
       const nf = row.files && typeof row.files === "object" ? Object.keys(row.files).filter((k) => /\/colr$/.test(k)).length : 0;
       if (nf < 5) return json({ error: "not_wanted" }, 404); // a real Peak Pro has all six light slots
       const key = "edclaim:" + hash;
