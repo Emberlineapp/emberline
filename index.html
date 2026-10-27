@@ -251,6 +251,7 @@ section.view>*{min-width:0}
 .dbl-big{font:900 64px/1 var(--f-round,system-ui);background:linear-gradient(120deg,#ff2200,#ff9900,#ffd23f);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 18px #ff990088)}
 .dbl-note{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 8px);z-index:300;display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:18px;background:linear-gradient(120deg,#ff2200,#ff9900 60%,#ffd23f);color:#1d0a00;box-shadow:0 10px 30px #0008;transform:translateY(-140%);transition:transform .45s cubic-bezier(.2,.9,.3,1.2);cursor:pointer;max-width:520px;margin:0 auto}
 .dbl-note.sx{background:linear-gradient(120deg,#0fa37f,#2bd9ff 55%,#ffd23f);color:#04201a}
+.dbl-note.ed{background:linear-gradient(120deg,#5b00c9,#b46cff 45%,#2bd9ff);color:#fff}.dbl-note.ed small{color:#f1e6ff}
 .dbl-note.on{transform:none}.dbl-note>b{font-size:26px}.dbl-note span{display:grid;gap:1px;min-width:0}.dbl-note span b{font:800 15px var(--f-round,system-ui)}.dbl-note small{font-size:12.5px;font-weight:600}
 .dbl-rp{display:grid;gap:2px;padding:10px 12px;border-radius:14px;background:linear-gradient(120deg,#ff2200,#ff9900 55%,#ffd23f);color:#1d0a00;cursor:pointer;animation:dblGlow 2.4s ease-in-out infinite}.dbl-rp b{font:800 16px var(--f-round,system-ui)}.dbl-rp span{font-size:13px;font-weight:600}
 @keyframes dblGlow{0%,100%{box-shadow:0 0 0 0 #ff990000}50%{box-shadow:0 0 22px 2px #ff9900aa}}
@@ -8119,6 +8120,21 @@ function seshPremNote(force){
 (function seshNoteWait(n){ if (store.seshNoteSeen || n > 60) return;
   const busy = greetOpen || document.getElementById('spl') || document.getElementById('dblNote') || document.querySelector('.egg') || store.wnSeen !== WN_VER;
   if (!busy && isPremium()) setTimeout(() => { if (!document.querySelector('.egg') && !greetOpen) seshPremNote(); else seshNoteWait(n + 1); }, 2000); else setTimeout(() => seshNoteWait(n + 1), 3000); })(0);
+// Premium: a one-time heads up that the special edition colorways are in their Lights. Tap it to see them
+function edPremNote(force){
+  if (document.getElementById('edNote') || (!force && store.edNoteSeen)) return;
+  const el = document.createElement('div'); el.id = 'edNote'; el.className = 'dbl-note ed'; el.setAttribute('role', 'status');
+  el.innerHTML = `<b>💎</b><span><b>Premium: special edition moods</b><small>We’re adding every special edition Puffco colorway for you. Plasma and Glacier are in your Lights now. Tap to see</small></span>`;
+  document.body.appendChild(el); buzz([30, 40, 30]); store.edNoteSeen = 1; save();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  const hide = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 400); };
+  el.onclick = () => { hide(); show('lights'); setTimeout(() => { const g = [...document.querySelectorAll('#moodLib .label')].find(x => /Puffco exclusives/i.test(x.textContent)); if (g) g.scrollIntoView({ block:'start', behavior:'smooth' }); }, 350); };
+  setTimeout(hide, 9000);
+}
+// waits for the profile (to know you're Premium) and for other banners and popups, the Group sesh one included
+(function edNoteWait(n){ if (store.edNoteSeen || n > 80) return;
+  const busy = greetOpen || document.getElementById('spl') || document.getElementById('dblNote') || document.getElementById('sxNote') || document.querySelector('.egg') || store.wnSeen !== WN_VER || (isPremium() && !store.seshNoteSeen);
+  if (!busy && isPremium()) setTimeout(() => { if (!document.querySelector('.egg') && !greetOpen && !document.getElementById('sxNote')) edPremNote(); else edNoteWait(n + 1); }, 2500); else setTimeout(() => edNoteWait(n + 1), 3000); })(0);
 function dblNote(){
   const e = dblNow(); if (!e || document.getElementById('dblNote')) return;
   const el = document.createElement('div'); el.id = 'dblNote'; el.className = 'dbl-note'; el.setAttribute('role', 'status');
