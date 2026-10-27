@@ -184,6 +184,10 @@ Deno.serve(async (req) => {
       if (!a || !b) return json({ error: "not_friends" }, 403);
       const { data: last } = await sb.from("notes").select("created_at").eq("player", target).eq("from_id", id).eq("kind", "invite").order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (last && Date.now() - new Date(last.created_at).getTime() < 30000) return json({ ok: true, skipped: true }); // no spamming
+      if (body.kind === "sesh") { // group sesh: same invite, different words
+        const sent = await notify(target, "invite", { code, sesh: true }, `🔥 ${existing.username} started a group sesh`, "Open Emberline to heat up together");
+        return json({ ok: true, pushed: sent });
+      }
       const bet = Math.max(0, Math.min(100, Math.round(Number(body.bet) || 0)));
       const sent = await notify(target, "invite", { code, bet, rules: body.rules && typeof body.rules === "object" ? body.rules : null }, `🔥 ${existing.username} wants to 1v1`, bet ? `Bet: ${bet} RP. Open Emberline to accept` : "Open Emberline to accept");
       return json({ ok: true, pushed: sent });
