@@ -164,6 +164,13 @@ Deno.serve(async (req) => {
       await sb.from("push_links").insert({ code, player: id, until: new Date(Date.now() + 15 * 60000).toISOString() });
       return json({ code });
     }
+    // straight from the app, when the browser itself can do push (Path, Chrome): no code needed
+    if (body.action === "push_sub") {
+      const sub = body.sub;
+      if (!sub || typeof sub.endpoint !== "string" || !/^https:\/\//.test(sub.endpoint) || !sub.keys) return json({ error: "bad_sub" }, 400);
+      await sb.from("push_subs").upsert({ endpoint: sub.endpoint, player: id, sub });
+      return json({ ok: true, sent: await pushTo([{ endpoint: sub.endpoint, sub }], { title: "Emberline notifications are on 🔥", body: "1v1 invites and new followers will show up here." }) });
+    }
     if (body.action === "push_off") { await sb.from("push_subs").delete().eq("player", id); return json({ ok: true }); }
     if (body.action === "push_me") return json({ ok: true, sent: await pushPlayer(id, { title: "Test from Emberline", body: "Phone alerts work. 🔥" }) });
     // a 1v1 invite to a friend (you follow each other). The live invite still goes over the lobby; this reaches them when the app is closed
