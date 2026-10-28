@@ -336,6 +336,16 @@ Deno.serve(async (req) => {
       if (up.error) return json({ error: "banner_upload" }, 500);
       row.banner = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?v=" + Date.now();
     }
+    // Premium: a GIF profile picture, kept as it is (up to 1 MB) so it keeps moving
+    if (premium && typeof body.avatar === "string" && body.avatar.startsWith("data:image/gif;base64,")) {
+      const bytes = Uint8Array.from(atob(body.avatar.split(",")[1]), (c) => c.charCodeAt(0));
+      if (bytes.length > 1050000) return json({ error: "avatar_too_big" }, 400);
+      if (!(bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46)) return json({ error: "avatar_not_gif" }, 400); // starts with "GIF"
+      const path = id + "-av.gif";
+      const up = await sb.storage.from("avatars").upload(path, bytes, { contentType: "image/gif", upsert: true, cacheControl: "31536000" });
+      if (up.error) return json({ error: "avatar_upload" }, 500);
+      row.avatar_url = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?v=" + Date.now();
+    }
     if (typeof body.bio === "string") row.bio = body.bio.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 160);
     if (body.stats && typeof body.stats === "object") {
       // profile stats from the app (tap a name to see them): only these numbers, kept in a sane range

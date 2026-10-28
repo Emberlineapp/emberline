@@ -5052,6 +5052,7 @@ function premInfo(){
       <div><b>🎆 Premium moods</b><br><span class="muted" style="font-size:14px">Exclusive lights for your Peak: Rich Plasma, Rich Flourish, Gold Rush and Aurora Drift.</span></div>
       <div><b>💎 Limited edition colorways</b><br><span class="muted" style="font-size:14px">Puffco’s own special edition lights (Plasma, Glacier and Flourish) on any Peak Pro, plus more as we find them.</span></div>
       <div><b>🎨 Custom banner</b><br><span class="muted" style="font-size:14px">Pick a banner for the top of your profile (Edit profile).</span></div>
+      <div><b>🖼️ GIF profile picture</b><br><span class="muted" style="font-size:14px">Pick a GIF as your profile picture and it moves everywhere your picture shows.</span></div>
       <div><b>🚀 Early access</b><br><span class="muted" style="font-size:14px">Try new features before everyone else, like the VR panel.</span></div>
       <div><b>🏅 Premium badge</b><br><span class="muted" style="font-size:14px">A legendary badge you can show off in your showcase.</span></div>
       <div><b>💎 Discord role</b><br><span class="muted" style="font-size:14px">A special Premium role in the Emberline Discord.</span></div>
@@ -5105,11 +5106,19 @@ premBnrInput.addEventListener('change', async e => {
   } catch(err){ toast(err.message || 'Couldn’t use that picture'); }
   e.target.value = '';
 });
+// Premium: a GIF profile picture goes up as it is (redrawing it would freeze it), the circle crops it on screen
+const AV_GIF_MAX = 1e6;
+function avGif(file){
+  return new Promise((resolve, reject) => {
+    if (file.size > AV_GIF_MAX) return reject(new Error(`That GIF is ${(file.size / 1e6).toFixed(1)} MB. Profile GIFs can be up to 1 MB, try a shorter or smaller one`));
+    const fr = new FileReader(); fr.onload = () => resolve(String(fr.result).replace(/^data:[^;]*;/, 'data:image/gif;')); fr.onerror = () => reject(new Error('Couldn’t read that GIF')); fr.readAsDataURL(file);
+  });
+}
 const AV_PX = 160; // profile pictures: 160px (shown at 84px at most), about a quarter of the old 320px size
 // once per account: an old big profile picture gets shrunk and saved again, so everyone downloads less
 let avTried = false;
 function avShrink(){
-  const me = LB.me; if (avTried || !me || !me.avatar_url || !lbUsesPuffco() || (store.avSmall || {})[me.id]) return;
+  const me = LB.me; if (avTried || !me || !me.avatar_url || /\.gif\?/.test(me.avatar_url) || !lbUsesPuffco() || (store.avSmall || {})[me.id]) return;
   const img = new Image(); img.crossOrigin = 'anonymous';
   img.onload = async () => {
     try {
@@ -5136,7 +5145,7 @@ function lbResize(file){
     img.src = url;
   });
 }
-const LB_ERRS = { banner_too_big:'That banner is too big. Pictures up to 150 KB after cropping, GIFs up to 1.5 MB.', banner_not_gif:'That file isn’t a real GIF.', banner_upload:'Couldn’t save the banner. Try again.', slow_down:'Too fast, try again in a second.', too_many_accounts:'This phone already made new accounts today. Try again tomorrow or ask in the Discord.', new_device:'This phone isn’t linked to your account yet. Open Emberline on the phone you joined with, or ask in the Discord.', name_cooldown:'You can only change your username once every 3 days.', banned:'This account is banned from ranked and social. Ask in the Emberline Discord if you think this is a mistake.', puffco_required:'Sign in to Puffco in Settings to join ranked.', username_invalid:'Usernames are 3 to 20 letters, numbers, _ or .', username_taken:'That username is taken.', username_required:'Pick a username first.', avatar_too_big:'That picture is too big.', puffco_auth:'Your Puffco sign-in expired. Sign in again in Settings.', auth:'Couldn’t sign you in. Try again.' };
+const LB_ERRS = { banner_too_big:'That banner is too big. Pictures up to 150 KB after cropping, GIFs up to 1.5 MB.', banner_not_gif:'That file isn’t a real GIF.', banner_upload:'Couldn’t save the banner. Try again.', slow_down:'Too fast, try again in a second.', too_many_accounts:'This phone already made new accounts today. Try again tomorrow or ask in the Discord.', new_device:'This phone isn’t linked to your account yet. Open Emberline on the phone you joined with, or ask in the Discord.', name_cooldown:'You can only change your username once every 3 days.', banned:'This account is banned from ranked and social. Ask in the Emberline Discord if you think this is a mistake.', puffco_required:'Sign in to Puffco in Settings to join ranked.', username_invalid:'Usernames are 3 to 20 letters, numbers, _ or .', username_taken:'That username is taken.', username_required:'Pick a username first.', avatar_too_big:'That picture is too big. Profile GIFs can be up to 1 MB.', avatar_not_gif:'That file isn’t a real GIF.', avatar_upload:'Couldn’t save the picture. Try again.', puffco_auth:'Your Puffco sign-in expired. Sign in again in Settings.', auth:'Couldn’t sign you in. Try again.' };
 
 /* ---- badge showcase: up to 3 badges on your profile ---- */
 function showBadge(key, size, row){
@@ -5990,7 +5999,7 @@ let lbPicBusy = false;
 lbPicFile.addEventListener('change', async () => {
   const f = lbPicFile.files && lbPicFile.files[0]; if (!f || lbPicBusy) return;
   lbPicBusy = true;
-  try { const v = await cropAvatar(f); if (v){ LB.avatar = v; LB.err = ''; } } catch(err){ LB.err = err.message; }
+  try { const v = f.type === 'image/gif' && isPremium() ? await avGif(f) : await cropAvatar(f); if (v){ LB.avatar = v; LB.err = ''; if (v.startsWith('data:image/gif')) toast('GIF profile picture ready. Tap Save profile'); } } catch(err){ LB.err = err.message; }
   finally { lbPicBusy = false; lbPicFile.value = ''; } // reset after, so the same photo can be picked again
   const keep = $('#lbName') && $('#lbName').value; drawLeaderboard(); if (keep != null && $('#lbName')) $('#lbName').value = keep;
 });
