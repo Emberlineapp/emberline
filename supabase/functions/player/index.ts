@@ -352,6 +352,8 @@ Deno.serve(async (req) => {
       const st: Record<string, number> = {};
       for (const k of ["sessions", "hits", "days", "blAll", "dw", "dl", "dd"]) { const v = Number(body.stats[k]); if (Number.isFinite(v)) st[k] = Math.max(0, Math.min(100000, Math.round(v))); } // dw/dl/dd: 1v1 wins, losses, draws (all time)
       { const v = Number(body.stats.best); if (Number.isFinite(v)) st.best = Math.max(0, Math.min(120, Math.round(v * 10) / 10)); }
+      // for the iPhone app's widgets: clean meter and dab streak (the latest phone's numbers, they can go down)
+      for (const k of ["clean", "cleanEvery", "streak"]) { const v = Number(body.stats[k]); if (Number.isFinite(v)) st[k] = Math.max(0, Math.min(100000, Math.round(v))); }
       // several devices on one account: never let a phone or tablet with less history lower the numbers.
       // All-time blinkers always keep the highest; this month's numbers keep the highest within the same month
       const old = existing && existing.stats && typeof existing.stats === "object" ? existing.stats : {};
