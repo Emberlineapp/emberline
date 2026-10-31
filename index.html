@@ -21,7 +21,22 @@
 @keyframes splBreath{50%{transform:scale(1.08);opacity:.75}}
 @keyframes splUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes splSlide{from{transform:translateX(-110%)}to{transform:translateX(280%)}}
-@media (prefers-reduced-motion:reduce){.spl *,.spl::before{animation:none!important;opacity:1!important}}
+/* Halloween (Oct 31 only, or ?halloween): pumpkin fire, a jack-o'-lantern face, bats and a web */
+.spl.hw::before{background:radial-gradient(circle,rgba(255,110,0,.30),rgba(120,0,170,.10) 48%,transparent 70%)}
+.spl.hw .spl-mark{filter:drop-shadow(0 6px 26px rgba(255,120,0,.55))}
+.spl.hw .spl-bar i{background:linear-gradient(90deg,transparent,#ffb347,#ff6a00,transparent)}
+.spl-face{opacity:0;animation:splFace .5s ease-out 1.25s forwards}
+.spl-face .lit{animation:splCandle 1.2s ease-in-out 1.8s infinite}
+.spl-hw{font:700 13px/1 'Chakra Petch',system-ui,sans-serif;letter-spacing:.28em;margin-right:-.28em;text-transform:uppercase;color:#ff9a3c;text-shadow:0 0 14px rgba(255,120,0,.6);opacity:0;animation:splUp .6s ease-out .9s forwards;margin-top:-10px}
+.spl.hw .spl-mark>path.fill{display:none}
+.spl-bat{position:absolute;width:46px;height:22px;left:0;top:0;fill:#4a2a66;filter:drop-shadow(0 0 5px rgba(255,120,0,.55));opacity:0;animation:splBat 2.6s linear forwards}
+.spl-bat path{transform-origin:17px 8px;animation:splFlap .18s ease-in-out infinite alternate}
+.spl-web{position:absolute;left:0;top:0;width:150px;height:150px;fill:none;stroke:rgba(255,255,255,.13);stroke-width:1;opacity:0;animation:splUp 1s ease-out .3s forwards}
+@keyframes splFace{from{opacity:0}to{opacity:1}}
+@keyframes splCandle{50%{opacity:.7}}
+@keyframes splFlap{to{transform:scaleY(.6)}}
+@keyframes splBat{0%{opacity:0;transform:translate(var(--x0),var(--y0)) scale(var(--s))}12%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translate(var(--x1),var(--y1)) scale(var(--s))}}
+@media (prefers-reduced-motion:reduce){.spl *,.spl::before{animation:none!important;opacity:1!important}.spl .spl-bat{display:none}}
 .last-sess{display:grid;gap:8px;padding:12px 14px;border-radius:16px;background:var(--fill,rgba(255,255,255,.06))}
 .ls-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;text-align:center}
 .ls-grid b{display:block;font-size:17px;font-variant-numeric:tabular-nums}.ls-grid span{font-size:11px;color:var(--muted,#a1a1a6)}
@@ -67,12 +82,26 @@
 </div>
 <script>(function(){var t0=Date.now(),done=false,loaded=false,ready=false,tick=0;
 function hide(){if(done)return;done=true;clearInterval(tick);var el=document.getElementById('spl');if(!el)return;el.classList.add('out');setTimeout(function(){el.remove()},600)}
-function check(){var t=Date.now()-t0;if(loaded&&t>=1600&&(ready||t>=3200))hide()}
+function check(){var t=Date.now()-t0;if(loaded&&t>=(window.emberSplashMin||1600)&&(ready||t>=3200))hide()}
 // the app starts Bluetooth while this screen is up and calls this once connected (or once it gives up)
 window.emberSplashReady=function(){ready=true;check()};
 window.emberSplashNote=function(txt){var n=document.getElementById('splNote');if(n){n.textContent=txt;n.classList.add('on')}};
 function onLoad(){loaded=true;check();tick=setInterval(check,150)}
-if(document.readyState==='complete')onLoad();else window.addEventListener('load',onLoad);setTimeout(hide,7000)})();</script>
+if(document.readyState==='complete')onLoad();else window.addEventListener('load',onLoad);setTimeout(hide,7000)})();
+// Halloween: Oct 31 (or ?halloween to try it): orange fire, a face on the flame, bats flying past, a web in the corner
+(function(){var d=new Date();if(!(d.getMonth()===9&&d.getDate()===31)&&!/[?&]halloween/.test(location.search))return;
+var el=document.getElementById('spl');if(!el)return;el.classList.add('hw');window.emberSplashMin=2400;
+var st=el.querySelectorAll('#splG stop');if(st.length===3){st[0].setAttribute('stop-color','#4a1400');st[1].setAttribute('stop-color','#ff6a00');st[2].setAttribute('stop-color','#ffd27a')}
+var svg=el.querySelector('.spl-mark'),ns='http://www.w3.org/2000/svg';
+if(svg){var g=document.createElementNS(ns,'g');g.setAttribute('class','spl-face');
+g.innerHTML='<path d="M9.4 13.2l1.1-1.9 1 1.9z M12.6 13.2l1-1.9 1.1 1.9z M9.3 14.9c.6.3 1 .3 1.4.1l.4.5.5-.5.5.5.4-.5c.4.2.9.2 1.5-.1-.4 1.3-1.3 2-2.8 2s-2.4-.7-2.7-2z" fill="#1d0a00"/><path class="lit" d="M9.9 12.9l.6-1 .5 1z M13.1 12.9l.5-1 .6 1z" fill="#ffe08a" opacity=".9"/>';svg.appendChild(g)}
+var w=document.createElementNS(ns,'svg');w.setAttribute('class','spl-web');w.setAttribute('viewBox','0 0 150 150');
+w.innerHTML='<path d="M0 0L150 40M0 0L110 110M0 0L40 150M0 30Q22 22 26 0M0 62Q45 48 52 0M0 96Q70 74 80 0M0 128Q92 100 110 0"/>';el.appendChild(w);
+var W=innerWidth,H=innerHeight;[[-.15,.22,1.1,.12,1,.1],[1.1,.34,-.2,.18,.75,.5],[-.2,.62,1.15,.48,.9,.85]].forEach(function(b){
+var s=document.createElementNS(ns,'svg');s.setAttribute('class','spl-bat');s.setAttribute('viewBox','0 0 34 16');
+s.innerHTML='<path d="M17 5c-1-2-2-3-2-3l.6 2.4C13 4 9 3 1 6c4 0 6 2 7 5 1-2 3-2 4.5-1 .5-2 1.5-3 4.5-3s4 1 4.5 3c1.5-1 3.5-1 4.5 1 1-3 3-5 7-5-8-3-12-2-14.6-1.6L19 2s-1 1-2 3z"/>';
+s.style.setProperty('--x0',(b[0]*W)+'px');s.style.setProperty('--y0',(b[1]*H)+'px');s.style.setProperty('--x1',(b[2]*W)+'px');s.style.setProperty('--y1',(b[3]*H)+'px');s.style.setProperty('--s',b[4]);s.style.animationDelay=b[5]+'s';el.appendChild(s)});
+var t=document.createElement('span');t.className='spl-hw';t.textContent='Happy Halloween';var bar=el.querySelector('.spl-bar');if(bar)bar.parentNode.insertBefore(t,bar)})();</script>
 <title>Emberline</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Saira+Semi+Condensed:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&family=Silkscreen:wght@400;700&family=Anton&family=Barlow+Condensed:wght@500;600;700&display=swap">
 <meta name="apple-mobile-web-app-capable" content="yes">
