@@ -5069,9 +5069,33 @@ function premStar(size){ // tap it: what Premium is
   const id = 'pst' + (premUid++);
   return `<svg class="prem-star" data-prem viewBox="0 0 24 24" width="${size}" height="${size}" role="button" aria-label="Premium"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff4c9"/><stop offset=".5" stop-color="#ffd23f"/><stop offset="1" stop-color="#e09a00"/></linearGradient></defs><path d="M12 2.2l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.1l-5.9 3.1 1.2-6.5L2.5 9.1l6.6-.9z" fill="url(#${id})" stroke="#7a4a00" stroke-width=".8" stroke-linejoin="round"/></svg>`;
 }
-function premInfo(){
+/* ===== Premium by card (Stripe) =====
+   The checkout link carries your player id (client_reference_id). When the payment goes through, Stripe tells the
+   stripe edge function, which turns Premium on until the paid month ends (and keeps extending it on each renewal). */
+const STRIPE_LINK = 'https://buy.stripe.com/7sY00cbWEcaS7rV8uagYU00';
+const stripeOn = () => true; // the card checkout is on for everyone
+function stripeUrl(){ const me = LB.me || lbStore().meCache; return me && me.id ? STRIPE_LINK + '?client_reference_id=' + encodeURIComponent(me.id) : null; }
+function stripeBlock(isPrem){
+  const url = stripeUrl();
+  if (isPrem) return `<p class="muted" style="margin:0;font-size:14px">Paying by card? It renews every month on its own. To cancel, use the link in your Stripe receipt email.</p>`;
+  return `<div style="display:grid;gap:4px"><b>$10 a month</b><span class="muted" style="font-size:14px">Card or Apple Pay. Premium turns on by itself a minute after you pay, and you can cancel any time.</span></div>
+    ${url ? `<a class="btn primary" href="${url}" target="_blank" rel="noopener" data-stripe style="width:100%;text-align:center;text-decoration:none">Get Premium · $10/month</a>`
+          : `<button class="btn primary" disabled style="width:100%">Make your profile in Social first</button>`}`;
+}
+// back from the checkout: ask the server once a few times so Premium shows right away
+// the checkout opens outside the page: in the iPhone app that's your default browser (Apple Pay works there).
+// Path keeps it inside Path (handing it to Safari with x-safari- just showed Path's error page), and cards work there
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-stripe]')){ store.stripeAt = Date.now(); save(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && store.stripeAt && Date.now() - store.stripeAt < 30 * 60000) stripeCheck(0); });
+async function stripeCheck(n){
+  if (isPremium()){ store.stripeAt = 0; save(); return; }
+  try { const r = await lbCall({ action:'me' }); if (r && r.player){ LB.me = r.player; lbStore().meCache = r.player; save(); } } catch(e){}
+  if (isPremium()){ store.stripeAt = 0; save(); toast('Premium is on ⭐ Thank you!'); try { drawPremCard(); drawSocial(); } catch(e){} return; }
+  if (n < 6) setTimeout(() => stripeCheck(n + 1), 5000);
+}
+function premInfo(asFree){ // asFree: see it the way someone without Premium does
   if (document.querySelector('.egg.prem')) return;
-  const me = isPremium(), el = document.createElement('div'); el.className = 'egg prem'; el.style.zIndex = 240;
+  const me = !asFree && isPremium(), el = document.createElement('div'); el.className = 'egg prem'; el.style.zIndex = 240;
   el.innerHTML = `<div class="egg-card" role="dialog" aria-label="Emberline Premium" style="text-align:left;justify-items:stretch;gap:12px;max-height:86vh;overflow:auto">
     <div style="display:grid;justify-items:center;gap:6px"><h2 style="margin:0;text-align:center">Emberline Premium ${premStar(26)}</h2>${me ? `<span class="label" style="color:#ffd23f">You’re Premium. Thank you!${premEnds(LB.me || lbStore().meCache) ? ' · until ' + new Date(premEnds(LB.me || lbStore().meCache) + 'T12:00').toLocaleDateString([], { month:'short', day:'numeric' }) : ''}</span>` : '<span class="muted" style="font-size:13px">Here’s how your profile would look</span>'}</div>
     ${premPreview()}
@@ -5086,9 +5110,9 @@ function premInfo(){
       <div><b>🏅 Premium badge</b><br><span class="muted" style="font-size:14px">A legendary badge you can show off in your showcase.</span></div>
       <div><b>💎 Discord role</b><br><span class="muted" style="font-size:14px">A special Premium role in the Emberline Discord.</span></div>
     </div>
-    <div style="display:grid;gap:4px"><b>How to get it</b>
+    ${asFree || stripeOn() ? stripeBlock(me) : `<div style="display:grid;gap:4px"><b>How to get it</b>
       <ol style="margin:0;padding-left:20px;color:var(--muted);font-size:14px;display:grid;gap:2px"><li>Join the Emberline Discord.</li><li>Open a ticket.</li><li>Pay with Cash App, Zelle, Venmo or Apple Pay.</li><li>We turn on Premium for your username. It shows the next time you open Emberline.</li></ol></div>
-    <a class="btn primary" href="${DISCORD_URL}" target="_blank" rel="noopener" style="width:100%;text-align:center;text-decoration:none">Join the Discord</a>
+    <a class="btn primary" href="${DISCORD_URL}" target="_blank" rel="noopener" style="width:100%;text-align:center;text-decoration:none">Join the Discord</a>`}
     <button class="btn" id="premX" style="width:100%">Close</button></div>`;
   document.body.appendChild(el); applyHaptics(); requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
   const opened = Date.now(), shut = () => { clearInterval(cyc); el.classList.remove('on'); setTimeout(() => el.remove(), 260); };
