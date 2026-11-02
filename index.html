@@ -5086,6 +5086,38 @@ function premStar(size){ // tap it: what Premium is
   const id = 'pst' + (premUid++);
   return `<svg class="prem-star" data-prem viewBox="0 0 24 24" width="${size}" height="${size}" role="button" aria-label="Premium"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff4c9"/><stop offset=".5" stop-color="#ffd23f"/><stop offset="1" stop-color="#e09a00"/></linearGradient></defs><path d="M12 2.2l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.1l-5.9 3.1 1.2-6.5L2.5 9.1l6.6-.9z" fill="url(#${id})" stroke="#7a4a00" stroke-width=".8" stroke-linejoin="round"/></svg>`;
 }
+/* ===== a rare "support Emberline" nudge for people without Premium =====
+   Not in the first 3 days or before 5 sessions, at most once a week and only on about 1 in 3 opens, and every 3 weeks
+   once someone has said "Not now" 3 times. Never mid-session, in a 1v1 or group sesh, or over another popup */
+function supportNudge(force){
+  const st = store.support || {}, now = Date.now();
+  if (!force){
+    if (isPremium() || demo || document.hidden || greetOpen || document.querySelector('.egg, .welcome:not([hidden])')) return;
+    if ((S.state >= 7 && S.state <= 9) || DUEL.on || SESH.on) return;
+    if (!st.first){ store.support = { first: now }; save(); return; }
+    if (now - st.first < 3 * 864e5 || (store.sessions || []).length < 5) return;
+    if (now - (st.at || 0) < ((st.no || 0) >= 3 ? 21 : 7) * 864e5) return;
+    if (Math.random() > .35) return;
+  }
+  store.support = Object.assign({}, st, { at: now }); save();
+  const el = document.createElement('div'); el.className = 'egg'; el.style.zIndex = 235;
+  el.innerHTML = `<div class="egg-card" role="dialog" aria-label="Support Emberline" style="gap:12px">
+    <div style="font-size:40px;line-height:1">🔥</div>
+    <h2 style="margin:0">Enjoying Emberline?</h2>
+    <p class="muted" style="margin:0;font-size:15px">Emberline is free and made by one person. Premium keeps it running, and you get a gold star, Premium moods, Puffco's limited edition colorways, GIF profile pictures and banners.</p>
+    <button class="btn primary" data-sup="go" style="width:100%">See Premium ${premStar(18)}</button>
+    <button class="btn" data-sup="no" style="width:100%">Not now</button></div>`;
+  document.body.appendChild(el); applyHaptics();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  const opened = Date.now(), shut = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 260); };
+  el.addEventListener('click', e => {
+    if (Date.now() - opened < 400) return;
+    const b = e.target.closest('[data-sup]');
+    if (b && b.dataset.sup === 'go'){ shut(); setTimeout(premInfo, 280); return; }
+    if (b || e.target === el){ store.support = Object.assign({}, store.support, { no: (store.support.no || 0) + 1 }); save(); shut(); }
+  });
+}
+setTimeout(() => { try { supportNudge(); } catch(e){} }, 25000);
 /* ===== Premium by card (Stripe) =====
    The checkout link carries your player id (client_reference_id). When the payment goes through, Stripe tells the
    stripe edge function, which turns Premium on until the paid month ends (and keeps extending it on each renewal). */
