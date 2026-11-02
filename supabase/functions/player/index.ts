@@ -281,6 +281,32 @@ Deno.serve(async (req) => {
     // daily limit: going over 1000 RP in one day (UTC) locks you out of ranked for 24h. RP doesn't change while locked
     const DAY_MAX = 1000, LOCK_MS = 86400000, now = Date.now(), today = new Date(now).toISOString().slice(0, 10);
     const lockedUntil = existing && existing.locked_until ? new Date(existing.locked_until).getTime() : 0;
+    // a month just ended for this player: keep their final score (the leaderboard only holds the current month),
+    // then hand out last month's Podium badges if nobody has yet. Everyone's final score is either in month_results
+    // (they've opened the app since) or still on their row (they haven't), so the top 3 is right whenever this runs
+    if (existing && typeof body.month === "string" && /^\d{4}-\d{2}$/.test(body.month) && existing.month && existing.month < body.month) {
+      await sb.from("month_results").upsert({ month: existing.month, player: id, username: existing.username, rp: existing.rp || 0, tier: existing.tier || null });
+      const m = existing.month, key = "podium:" + m;
+      const { data: done } = await sb.from("app_kv").select("key").eq("key", key).maybeSingle();
+      if (!done && m >= "2026-11") { // October was handed out by hand
+        await sb.from("app_kv").upsert({ key, value: { at: new Date().toISOString() } });
+        const { data: a } = await sb.from("month_results").select("player,rp").eq("month", m);
+        const { data: b } = await sb.from("players").select("id,rp").eq("month", m);
+        const best = new Map<string, number>();
+        for (const r of a || []) best.set(r.player, Math.max(best.get(r.player) || 0, r.rp || 0));
+        for (const r of b || []) best.set(r.id, Math.max(best.get(r.id) || 0, r.rp || 0));
+        const ids = [...best.keys()];
+        const { data: who } = ids.length ? await sb.from("players").select("id,awards,banned").in("id", ids) : { data: [] };
+        const top = (who || []).filter((p: { banned?: boolean }) => !p.banned)
+          .sort((x: { id: string }, y: { id: string }) => (best.get(y.id) || 0) - (best.get(x.id) || 0)).slice(0, 3);
+        for (let i = 0; i < top.length; i++) {
+          const p = top[i], aw: string[] = Array.isArray(p.awards) ? p.awards : [];
+          const next = [...new Set([...aw, "podium", "podium" + (i + 1)])];
+          if (next.length !== aw.length) await sb.from("players").update({ awards: next }).eq("id", p.id);
+          await sb.from("month_results").update({ place: i + 1 }).eq("month", m).eq("player", p.id);
+        }
+      }
+    }
     if (Number.isFinite(Number(body.rp))) {
       const v = n(body.rp), had = sameMonth ? existing.rp || 0 : 0;
       // the app sends base = the leaderboard RP it built on. A drop from that number is the rank tax, so allow more of one
@@ -299,7 +325,7 @@ Deno.serve(async (req) => {
     const joined = existing && existing.created_at ? new Date(existing.created_at).getTime() : Date.now();
     const handedOut = (k: string) => {
       if (k === "sp:premium") return premium;
-      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:squad"].includes(k)) return awards.includes(k.slice(3));
+      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:podium1", "sp:podium2", "sp:podium3", "sp:squad"].includes(k)) return awards.includes(k.slice(3));
       if (k === "sp:founder") return joined < Date.parse("2026-11-01T00:00:00Z");
       return true;
     };
