@@ -50,6 +50,21 @@ Deno.serve(async (req) => {
       return pushTo(subs || [], payload);
     };
     // the Alerts app (Safari, Home Screen) has no Puffco login: it gets the key, then pairs with a 6-character code from Emberline
+    // Puffco sign-in and sync for browsers that can't reach api.puffco.app themselves (Puffco blocks some websites).
+    // Passes the request straight through: only Puffco API paths, nothing is saved or logged here
+    if (body.action === "puffco") {
+      const path = typeof body.path === "string" ? body.path : "";
+      if (!/^\/api\/(users\/(login|refresh|me)|v1\/(mood-lights|heat-profiles|users\/[A-Za-z0-9_-]{1,64}\/profiles)|metrics\/(dabs|insights))(\?[A-Za-z0-9=&_.%-]{0,200})?$/.test(path)) return json({ error: "bad_path" }, 400);
+      const method = body.method === "POST" ? "POST" : "GET";
+      const h: Record<string, string> = { Accept: "application/json", Origin: "https://puffco.app", Referer: "https://puffco.app/",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" };
+      const src = body.headers && typeof body.headers === "object" ? body.headers : {};
+      for (const k of ["Authorization", "Content-Type", "x-app-type", "x-app-platform", "x-app-version"]) if (typeof src[k] === "string") h[k] = src[k].slice(0, 4000);
+      try {
+        const r = await fetch("https://api.puffco.app" + path, { method, headers: h, body: method === "POST" && typeof body.body === "string" ? body.body.slice(0, 20000) : undefined });
+        return json({ status: r.status, body: (await r.text()).slice(0, 2000000) });
+      } catch (e) { return json({ status: 0, body: String(e) }); }
+    }
     if (body.action === "push_key") return json({ key: (await vapid()).publicKey });
 
     // Limited Edition Testing (limited.html): an owner of a special edition shared its lights. Bug Hunter for that username, once per shared device
