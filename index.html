@@ -4236,7 +4236,7 @@ function sideCarry(){
 }
 window.emberSide = json => {
   let m = {}; try { m = JSON.parse(json) || {}; } catch(e){ return; }
-  if (m.type === 'status'){ SIDE.st = {}; SIDE.seen = SIDE.seen || {}; (m.devs || []).forEach(d => { if (d && d.id){ SIDE.st[d.id] = d; if (d.conn) SIDE.seen[d.id] = true; } }); drawSide(); const dm = $('#devMenu'); if (dm && !dm.hidden) drawDevMenu(); return; }
+  if (m.type === 'status'){ SIDE.st = {}; SIDE.seen = SIDE.seen || {}; (m.devs || []).forEach(d => { if (d && d.id){ SIDE.st[d.id] = d; if (d.conn) SIDE.seen[d.id] = true; if (d.name && !sideDev(d.id)){ devList().push({ id:d.id, name:d.name, label:d.name, series: d.proxy ? 'toad' : 'peach', last:0 }); save(); } } }); /* a device the app knows from the other site */ drawSide(); const dm = $('#devMenu'); if (dm && !dm.hidden) drawDevMenu(); return; }
   if (m.type === 'open'){ SIDE.open = { dev:m.dev, o:m.open, at:Date.now() }; return; }
   if (m.type === 'sessions'){
     let n = 0; (m.sessions || []).slice().sort((a, b) => a.t - b.t).forEach(s => { if (sideLog(s)) n++; });
@@ -8513,6 +8513,7 @@ $('#devMenu').addEventListener('click', e => {
   e.stopPropagation();
   const d = e.target.closest('[data-dev]'), f = e.target.closest('[data-forget]');
   if (f){ const list = devList(), x = list[+f.dataset.forget]; list.splice(+f.dataset.forget, 1);
+    if (x && IS_APP) window.EMBER_APP.post('multi', { forget: x.id }); // the app forgets it too
     if (x && x.id === store.lastDeviceId){ appAuto(false); const n = list[0]; store.lastDeviceId = n ? n.id : null; store.lastDeviceName = n ? n.name : null; }
     save(); drawDevMenu(); toast(`Forgot ${x ? (x.label || x.name) : 'device'}`); return; }
   if (d){ switchToDevice(devList()[+d.dataset.dev]); return; }
