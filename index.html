@@ -65,6 +65,22 @@
 .home-quick .btn{display:inline-flex;align-items:center;gap:6px}
 .home-quick .btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .home-quick .btn[aria-pressed="true"]{background:color-mix(in srgb,#ffc94a 22%,var(--fill,rgba(255,255,255,.08)));border-color:#ffc94a;color:#ffe08a;box-shadow:0 0 18px rgba(255,201,74,.35)}
+html[data-app] #fsRow{display:none!important}
+.mus-viz{position:relative;height:150px;display:grid;place-items:center;border-radius:18px;background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--mc,#7300ff) 22%,transparent),transparent 70%);overflow:hidden}
+.mus-viz i{width:84px;height:84px;border-radius:50%;background:var(--mc,#7300ff);box-shadow:0 0 40px var(--mc,#7300ff),0 0 90px color-mix(in srgb,var(--mc,#7300ff) 50%,transparent);transform:scale(calc(.7 + var(--ml,0) * .5));transition:transform .07s linear,background .12s,box-shadow .12s}
+.mus-viz.pop i{animation:musPop .28s ease-out}
+.mus-viz span{position:absolute;bottom:10px;font:700 13px var(--f-body,system-ui);letter-spacing:.06em;color:rgba(255,255,255,.75)}
+@keyframes musPop{0%{filter:brightness(1.8);transform:scale(1.25)}100%{filter:none}}
+.mus-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mus-head b{display:block;font-size:17px}.mus-head small{color:var(--muted);font-size:13px}
+.mus-row{display:grid;grid-template-columns:86px 1fr;align-items:center;gap:10px;font-size:14px}.mus-row span{color:var(--muted)}
+.mus-sep{height:1px;background:var(--line,rgba(255,255,255,.1));margin:2px 0}
+.mus-pals{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -2px;padding:2px}.mus-pals::-webkit-scrollbar{display:none}
+.mus-pals button{flex:none}
+.mus-pals button{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;border:1.5px solid var(--line,rgba(255,255,255,.12));background:var(--fill,rgba(255,255,255,.06));color:inherit;font:600 13px var(--f-body,system-ui)}
+.mus-pals button[aria-pressed="true"]{border-color:var(--accent)}
+.mus-pals i{width:22px;height:12px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){.mus-viz i{transition:none}.mus-viz.pop i{animation:none}}
 .egg.prem .egg-card{background-image:radial-gradient(130% 55% at 50% 0%,rgba(255,196,60,.20),transparent 62%);border:1px solid rgba(255,210,63,.35);box-shadow:0 0 0 1px rgba(255,210,63,.12),0 30px 80px rgba(0,0,0,.6),0 0 70px rgba(255,180,40,.16)}
 .pm-hero{position:relative;display:grid;justify-items:center;gap:6px;text-align:center;padding:10px 0 2px;isolation:isolate}
 .pm-rays{position:absolute;left:50%;top:44px;width:260px;height:260px;margin:-130px 0 0 -130px;z-index:-1;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 6%,rgba(255,210,63,.22) 8% 10%,transparent 12% 22%,rgba(255,210,63,.16) 24% 26%,transparent 28% 38%,rgba(255,210,63,.22) 40% 42%,transparent 44% 56%,rgba(255,210,63,.16) 58% 60%,transparent 62% 72%,rgba(255,210,63,.22) 74% 76%,transparent 78% 90%,rgba(255,210,63,.16) 92% 94%,transparent 96%);-webkit-mask:radial-gradient(circle,#000 20%,transparent 68%);mask:radial-gradient(circle,#000 20%,transparent 68%);animation:pmSpin 22s linear infinite}
@@ -2014,6 +2030,7 @@ body.vr-on #dvFrame{display:none}
       <div id="moodLib" style="display:grid;gap:16px"></div>
     </div>
     <div class="card" id="moodEditor" hidden style="display:grid;gap:12px"></div>
+    <div class="card" id="appLights" hidden style="display:grid;gap:10px"></div>
     <div class="card" style="display:grid;gap:10px">
       <div class="row between"><span class="label">LED brightness</span><span class="muted" style="font-size:13px">for <b id="brightFor" style="color:var(--fg)">this profile</b></span></div>
       <div id="brightList" style="display:grid;gap:4px"></div>
@@ -2101,7 +2118,7 @@ body.vr-on #dvFrame{display:none}
     </div>
     <div class="card" style="display:grid;gap:10px">
       <span class="label">Display</span>
-      <label class="toggle"><span>Full screen<br><span class="muted" style="font-size:13px" id="fsNote">Hides the browser bars</span></span><input type="checkbox" class="switch" id="tFull"></label>
+      <label class="toggle" id="fsRow"><span>Full screen<br><span class="muted" style="font-size:13px" id="fsNote">Hides the browser bars</span></span><input type="checkbox" class="switch" id="tFull"></label>
       <span class="label" style="margin-top:6px">Connection</span>
       <label class="toggle"><span>Connect automatically<br><span class="muted" style="font-size:13px">Reconnects to your last Peak when you open Emberline</span></span><input type="checkbox" class="switch" id="tAuto"></label>
       <label class="toggle"><span>Show all Bluetooth devices when pairing<br><span class="muted" style="font-size:13px">Use if your Peak has a custom name and won't show up</span></span><input type="checkbox" class="switch" id="tAll"></label>
@@ -2407,6 +2424,7 @@ function hapticTick(){
   } catch(e){}
 }
 function buzz(p){
+  if (window.EMBER_APP && window.EMBER_APP.native){ window.EMBER_APP.post('haptic', { kind: Array.isArray(p) ? 'success' : p >= 40 ? 'heavy' : p >= 20 ? 'medium' : 'light' }); return; } // the iPhone app: the real Taptic Engine
   try { if (navigator.vibrate && navigator.vibrate(p)) return; } catch(e){}
   const n = Array.isArray(p) ? Math.ceil(p.length / 2) : 1;
   for (let k = 0; k < n; k++) setTimeout(hapticTick, k * 160);
@@ -2801,6 +2819,8 @@ let pollTimer = null, slowTick = 0, busy = false;
 function connectDevice(){ return startConnect(false); }
 
 /* ================= full screen ================= */
+const IS_APP = !!(window.EMBER_APP && window.EMBER_APP.native); // the Emberline iPhone app (ios/): Bluetooth comes from the app
+const BG = { on:false }; // the app is in the background and its own tracker owns the Peak: the page stays off the link
 const IS_PATH = !!navigator.notifications || !!window.notifications || /PathBrowser|Path\//i.test(navigator.userAgent || '');
 const FS = {
   supported(){ const el = document.documentElement; return !!(window.requestFullscreen || el.requestFullscreen || el.webkitRequestFullscreen); },
@@ -3385,7 +3405,7 @@ function heatHitStep(duty, tempC, now){
   return HH.on;
 }
 function heatHitStart(){
-  if (HIT.loop) return;
+  if (HIT.loop || BG.on) return;
   heatHitReset(); HIT.supported = true; HIT.mode = 'heat';
   HIT.loop = setInterval(async () => {
     if (S.mode !== 'live' || (S.state !== 8 && S.state !== 7)){ hitLoopStop(); return; }
@@ -3411,7 +3431,7 @@ function heatHitStart(){
 const PH = { on:false };
 function proxyHitStep(v){ if (!PH.on && v >= .9) PH.on = true; else if (PH.on && v < .88) PH.on = false; return PH.on; }
 function hitLoopStart(){
-  if (HIT.loop || S.mode !== 'live') return;
+  if (HIT.loop || S.mode !== 'live' || BG.on) return; // BG: the iPhone app's tracker has the Peak while the app is closed
   if (S.api === 2) return heatHitStart(); // older firmware: no inhale sensor, time hits from the heater instead
   if (HIT.supported === false) return;
   HIT.mode = 'inhale';
@@ -3570,7 +3590,7 @@ async function switchToDevice(d){
   toggleDevMenu(false);
   if (currentDevId() === d.id) return;
   // let go of the current device quietly, then go straight to the chosen one
-  if (S.mode === 'live' || ble.connected){ manualDisconnect = true; reconnectRun++; stopPolling(); try { ble.disconnect(true); } catch(e){} S.mode = 'off'; await sleep(250); }
+  appAuto(false); if (S.mode === 'live' || ble.connected){ manualDisconnect = true; reconnectRun++; stopPolling(); try { ble.disconnect(true); } catch(e){} S.mode = 'off'; await sleep(250); }
   zoneLiveStop(true);
   store.lastDeviceId = d.id; store.lastDeviceName = d.name; save();
   ble.dev = null; manualDisconnect = false;
@@ -3586,7 +3606,7 @@ async function addDevice(){
   toggleDevMenu(false);
   addingFrom = (ble.dev && ble.dev.id) || store.lastDeviceId || null; // to spot the picker handing back the same device
   if (IS_PATH && addingFrom) toast('Pick your new device from the list. Puffcos show up by the name you gave them.');
-  if (S.mode === 'live' || ble.connected){ manualDisconnect = true; reconnectRun++; stopPolling(); try { ble.disconnect(true); } catch(e){} S.mode = 'off'; await sleep(250); }
+  appAuto(false); if (S.mode === 'live' || ble.connected){ manualDisconnect = true; reconnectRun++; stopPolling(); try { ble.disconnect(true); } catch(e){} S.mode = 'off'; await sleep(250); }
   ble.dev = null; manualDisconnect = false; setConnUI('idle');
   startConnect(true, false);
 }
@@ -3643,7 +3663,7 @@ async function autoReconnect(){
     if (await connectLast({ scan: n >= 3 ? 4000 : 0 })) return;
   }
   if (run === reconnectRun) clog('gave up reconnecting');
-  if (run === reconnectRun) setConnUI('error', { title:'Lost connection to your Peak', msg:'It may have gone to sleep, moved out of range, or connected to the Puffco app. Wake it and tap Try again.' });
+  if (run === reconnectRun) setConnUI('error', { title:'Lost connection to your Peak', msg: IS_APP ? 'It may have gone to sleep, moved out of range, or connected to the Puffco app. Wake it and Emberline reconnects on its own.' : 'It may have gone to sleep, moved out of range, or connected to the Puffco app. Wake it and tap Try again.' });
 }
 // background scan used for instant reconnects (Path browser supports this)
 async function scanForPeak(name, ms, id){
@@ -3674,7 +3694,18 @@ function armTapReconnect(){
   };
   document.addEventListener('pointerup', go, true);
 }
-function userDisconnect(){ manualDisconnect = true; reconnectRun++; ble.disconnect(); if (!ble.connected) onDropped(); }
+/* iPhone app: the app keeps a standing connect to your Peak, so it reconnects the moment the Peak wakes up or comes
+   back in range (however long it was gone). Tapping Disconnect, switching or forgetting the device turns that off */
+function appAuto(on){ if (IS_APP) window.EMBER_APP.post('auto', { on: !!on }); }
+let bleBackAt = 0;
+window.emberBleBack = id => { // the app reconnected the Peak on its own: attach to it now
+  if (S.mode === 'live' || C.state === 'connecting' || manualDisconnect || store.autoConnect === false) return;
+  if (store.lastDeviceId && id && store.lastDeviceId !== id) return;
+  if (Date.now() - bleBackAt < 4000) return; bleBackAt = Date.now();
+  try { clog('app: Peak is back, reconnecting'); } catch(e){}
+  autoReconnect();
+};
+function userDisconnect(){ appAuto(false); manualDisconnect = true; reconnectRun++; ble.disconnect(); if (!ble.connected) onDropped(); }
 
 // pause polling in the background, resume (or reconnect) when back
 function forceReconnect(why){
@@ -3799,7 +3830,7 @@ async function slowPoll(){
 
 let idleTick = 0;
 async function poll(){
-  if (busy || S.mode !== 'live') return;
+  if (busy || S.mode !== 'live' || BG.on) return;
   busy = true; let quiet = false;
   try {
     const prev = S.state;
@@ -3894,6 +3925,264 @@ function resumeOpenSess(){
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveOpenSess(); });
 window.addEventListener('pagehide', saveOpenSess);
+
+/* ===== iPhone app: tracking while the app is closed =====
+   iOS freezes the page in the background, so the app's own tracker (ios/Emberline/BackgroundTracker.swift) reads the
+   Peak instead. Going away: emberBgPause stops the page's polling and hands over the unfinished session. Coming back:
+   emberBgResume gets the sessions it tracked (with hits, so blinkers count) and logs them here like any other. */
+// the exact light data the page would write, so the app plays the same effects on the Peak while it's closed
+function appFx(){
+  const p = S.profiles[S.active] || {};
+  let torch = null; try { if (torchOk() && torchCfg().on) torch = { s: torchCfg().s, e: torchCfg().e, profC: p.tempC, te: TORCH.te || 0 }; } catch(e){}
+  const key = [S.active, S.api, isProxy(), JSON.stringify(phVal(S.active)), store.warnColor, store.warnOn, store.warnSecs, store.bigHit, p.color, p.tempC].join('|');
+  if (appFx.key !== key){
+    const b64 = u8 => { let x = ''; for (const c of u8) x += String.fromCharCode(c); return btoa(x); }, v = {};
+    try { const ph = phVal(S.active); if (ph && S.api !== 2) v.preheat = b64(typeof ph === 'string' ? solidPayload(ph) : moodPayload(ph)); } catch(e){}
+    try { if (store.bigHit !== false){ if (S.api === 2) v.disco = b64(rgbt('#ff00ff')); else { const d = MOODS.excl.find(x => /disco/i.test(x.name)); if (d) v.disco = b64(moodPayload({ kind:'excl', id:d.id, name:d.name })); } } } catch(e){}
+    try { if (store.warnOn !== false){ const hx = store.warnColor || '#ffffff'; v.warn = b64(S.api === 2 ? rgbt(hx) : solidPayload(hx)); v.warnSecs = clamp(+store.warnSecs || 15, 3, 110); } } catch(e){}
+    try { if (S.api === 2) v.back = b64(rgbt(p.color || '#ffffff')); } catch(e){}
+    appFx.key = key; appFx.v = v;
+  }
+  return Object.assign({}, appFx.v, torch ? { torch } : {});
+}
+// the bell's own request, so the app can check for invites and followers while it's closed
+function appNotes(){
+  try {
+    if (!lbUsesPuffco() || !lbStore().joined) return null;
+    const a = acct(), pid = a.data && a.data.user && a.data.user.id;
+    return { url: SB_URL + '/functions/v1/player', key: SB_KEY, body: { puffcoToken: a.auth.accessToken, puffcoId: pid, device: devInfo() }, seen: ((typeof NOTE !== 'undefined' && NOTE.list) || []).map(n => String(n.id)) };
+  } catch(e){ return null; }
+}
+function appCtx(){
+  const o = cur ? { t:cur.t, readyAt:cur.readyAt || 0, p:cur.p, setF:cur.setF || 0, hits:(cur.hits || HIT.hits || []).slice(0, 20), ends:(HIT.ends || []).slice(0, 20) } : null;
+  const p = S.profiles[S.active] || {};
+  return { connected: S.mode === 'live', state: S.state, proxy: isProxy(), api: S.api, open: o, name: p.name || 'Session', color: /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : '#8a2bff',
+    targetF: Math.round(c2f(S.liveTargetC || p.tempC || 260)), blk: (cur && cur.blk) || +store.bigHitSecs || 8, p: S.active, fx: appFx(), notes: appNotes() };
+}
+if (IS_APP) setInterval(() => { if (!document.hidden) window.EMBER_APP.post('ctx', appCtx()); }, 2000);
+
+/* ===== iPhone app: native extras =====
+   Live Activity (lock screen + Dynamic Island) with the session, a native tap on buttons, and no Path-only settings */
+if (IS_APP){
+  document.documentElement.dataset.app = '1';
+  document.addEventListener('pointerdown', e => { const b = e.target.closest && e.target.closest(HZ_SEL + ', .btn, .pchip, [data-p], #nav > button'); if (b && !b.disabled) window.EMBER_APP.post('haptic', { kind: 'light' }); }, { passive: true });
+  let liveOn = false;
+  setInterval(() => {
+    if (BG.on) return; // the app's own tracker sends it while the app is closed
+    const heating = S.mode === 'live' && (S.state === 7 || S.state === 8);
+    if (!heating){ if (liveOn){ liveOn = false; window.EMBER_APP.post('live', { phase: S.state === 9 ? 'done' : 'idle' }); } return; }
+    liveOn = true;
+    const p = S.profiles[S.active] || {}, hits = (cur && cur.hits) || HIT.hits || [], blk = (cur && cur.blk) || +store.bigHitSecs || 8, last = hits.length ? hits[hits.length - 1] : 0;
+    window.EMBER_APP.post('live', { phase: S.state === 7 ? 'heat' : 'ready', name: p.name || 'Session', color: /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : '#8a2bff',
+      tempF: Math.round(c2f(S.tempC)), targetF: Math.round(c2f(S.liveTargetC || p.tempC || 260)),
+      readyAt: (cur && cur.readyAt) || 0, endsAt: S.state === 8 && S.total ? Date.now() + Math.max(0, S.total - liveElapsed()) * 1000 : 0,
+      hits: hits.length, lastHit: last, best: hits.length ? Math.max(...hits) : 0, blinker: last >= blk });
+  }, 1000);
+}
+
+/* ===== session card: a story-size picture of your last session, for Instagram Stories, Snapchat and friends =====
+   In the iPhone app it opens the native share sheet; in a browser it uses the browser's share, or downloads it */
+async function sessionCardPng(){
+  const all = rankSessions().slice().sort((a, b) => a.t - b.t), s = all[all.length - 1]; if (!s) return null;
+  const hits = s.hits || [], best = hits.length ? Math.max(...hits) : 0, blinks = hits.filter(h => h >= blinkOf(s)).length;
+  let rp = 0; try { rp = rankFor(all).rp - rankFor(all.slice(0, -1)).rp; } catch(e){}
+  const me = LB.me || lbStore().meCache || {}, name = me.username || store.name || 'Emberline', r = myRank(), len = typeof s.run === 'number' ? s.run : s.dur || 0;
+  const p = S.profiles[s.p] || S.profiles[S.active] || {}, col = /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : '#8a2bff';
+  try { await document.fonts.load('700 80px "Chakra Petch"'); } catch(e){}
+  const W = 1080, H = 1920, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#0b0a10'); g.addColorStop(.55, '#140a24'); g.addColorStop(1, '#05040a'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const glow = (cx, cy, rad, color) => { const rg = x.createRadialGradient(cx, cy, 0, cx, cy, rad); rg.addColorStop(0, color + 'aa'); rg.addColorStop(1, color + '00'); x.fillStyle = rg; x.fillRect(0, 0, W, H); };
+  glow(W * .2, H * .18, 700, col); glow(W * .85, H * .82, 650, '#7300ff');
+  const font = (w, px, fam) => { x.font = `${w} ${px}px ${fam || '"Chakra Petch", system-ui, sans-serif'}`; };
+  x.textAlign = 'center'; x.fillStyle = '#fff';
+  font(700, 64); x.letterSpacing = '18px'; x.fillText('EMBERLINE', W / 2 + 9, 230); x.letterSpacing = '0px';
+  font(600, 44, 'system-ui, sans-serif'); x.fillStyle = 'rgba(255,255,255,.7)'; x.fillText(new Date(s.t).toLocaleDateString([], { weekday:'long', month:'short', day:'numeric' }), W / 2, 310);
+  x.fillStyle = col; font(800, 70, 'system-ui, sans-serif'); x.fillText(s.name || 'Session', W / 2, 470);
+  // the big number: best hit
+  x.fillStyle = '#fff'; font(700, 300); x.fillText(best ? best.toFixed(1) + 's' : '—', W / 2, 820);
+  font(600, 48, 'system-ui, sans-serif'); x.fillStyle = 'rgba(255,255,255,.75)'; x.fillText('best hit', W / 2, 900);
+  if (blinks){ x.fillStyle = '#ffd23f'; font(800, 64, 'system-ui, sans-serif'); x.fillText(`🔥 ${blinks} BLINKER${blinks > 1 ? 'S' : ''}`, W / 2, 1020); }
+  const tiles = [[hits.length, 'hits'], [(rp > 0 ? '+' : '') + rp, 'RP'], [len ? len + 's' : '—', 'length']];
+  tiles.forEach(([v, l], i) => { const cx = W / 2 + (i - 1) * 320, y = 1180;
+    x.fillStyle = 'rgba(255,255,255,.07)'; x.beginPath(); x.roundRect(cx - 140, y - 100, 280, 220, 40); x.fill();
+    x.fillStyle = '#fff'; font(700, 92); x.fillText(String(v), cx, y + 30); font(600, 40, 'system-ui, sans-serif'); x.fillStyle = 'rgba(255,255,255,.7)'; x.fillText(l, cx, y + 90); });
+  x.fillStyle = '#fff'; font(800, 60, 'system-ui, sans-serif'); x.fillText(name, W / 2, 1520);
+  x.fillStyle = col; font(700, 46, 'system-ui, sans-serif'); x.fillText(`${r.tier.n} · ${r.rp} RP this month`, W / 2, 1590);
+  font(600, 38, 'system-ui, sans-serif'); x.fillStyle = 'rgba(255,255,255,.5)'; x.fillText('emberlineapp.github.io/emberline', W / 2, 1800);
+  return c.toDataURL('image/png');
+}
+async function shareSessionCard(){
+  const png = await sessionCardPng(); if (!png){ toast('No session yet'); return; }
+  const text = 'My session on Emberline 🔥';
+  if (IS_APP){ window.EMBER_APP.post('share', { png, text }); return; }
+  try {
+    const blob = await (await fetch(png)).blob(), file = new File([blob], 'emberline-session.png', { type:'image/png' });
+    if (navigator.canShare && navigator.canShare({ files:[file] })){ await navigator.share({ files:[file], text }); return; }
+  } catch(e){ if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = png; a.download = 'emberline-session.png'; document.body.appendChild(a); a.click(); a.remove(); toast('Saved the picture');
+}
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-sesshare]')){ e.stopPropagation(); shareSessionCard(); } });
+
+/* ===== iPhone app: camera color and music sync (Lights tab) ===== */
+let camLiveAt = 0;
+window.emberCameraLive = hex => { // the Peak follows the camera as you aim
+  if (S.mode !== 'live' || (S.state >= 7 && S.state <= 9) || isProxy() || Date.now() - camLiveAt < 400) return;
+  camLiveAt = Date.now(); ledJob(() => previewWrite(hex).catch(() => {}));
+};
+window.emberCameraColor = hex => {
+  ledJob(previewClear);
+  if (!hex) return;
+  const i = S.active, p = S.profiles[i]; if (!p) return;
+  p.color = hex; p.pal = null; p.mood = null; p.lightDirty = true;
+  if (S.mode === 'live') saveProfile(i).then(() => toast(`${p.name} is now ${hex.toUpperCase()}`)).catch(() => {}); else toast(`Color set. Connect to save it to your ${devWord()}`);
+  render(); try { drawProfiles(); } catch(e){}
+};
+/* ===== iPhone app: music sync =====
+   The app hears the music (bass beats and the tempo) and sends a tick on every beat, early by how long the Peak takes
+   to show a light. The page does NOT write a light per beat: rewriting the light file several times a second made
+   Peaks flash white and reboot. Instead it writes one animated mood (your colors pulsing at the song's BPM) and the
+   Peak plays it smoothly on its own. It's only written again when the tempo really changes or you change a setting,
+   never more than once every 10 seconds, and each write lands on a beat so the pulse starts in time */
+const MUSIC_PAL = { profile:{ n:'Your colors' }, rainbow:{ n:'Rainbow', c:['#ff0040','#ff8a00','#ffe600','#00ff6a','#00c8ff','#7300ff','#ff00d4'] },
+  fire:{ n:'Fire', c:['#ff2a00','#ff6a00','#ffb000','#ff3d1f','#ffd000'] }, ice:{ n:'Ice', c:['#00e5ff','#2a7bff','#bff6ff','#0050ff','#7fd7ff'] },
+  haze:{ n:'Purple haze', c:['#7300ff','#b05bff','#ff00d4','#4a00b0','#e6c4ff'] }, gold:{ n:'Gold', c:['#ffd23f','#ff9a00','#fff1a8','#e0a000','#ffbf3d'] } };
+const MUSIC = { cols:[], bpm:0, wroteBpm:0, wroteAt:0, wroteKey:'', busy:false, lat:.18, n:0, cur:'#7300ff', i:0 };
+const MUSIC_GAP = 10000; // never rewrite the light more often than this
+// a profile counts as "colors" only with 2+ clearly different hues; one-color profiles (all green on Medium) use Rainbow
+function profHues(){ const p = S.profiles[S.active] || {}, pal = (p.pal || []).filter(h => /^#[0-9a-f]{6}$/i.test(h)), hues = [];
+  pal.forEach(h => { const [r, g, b] = Array.from(hexBytes(h)), mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx < 60 || mx - mn < 40) return;
+    const d = mx - mn, hu = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4, deg = (hu * 60 + 360) % 360;
+    if (!hues.some(x => Math.min(Math.abs(x.deg - deg), 360 - Math.abs(x.deg - deg)) < 35)) hues.push({ deg, h }); });
+  return hues.map(x => x.h); }
+function musicCols(){
+  const k = store.musicPal || 'rainbow'; // Rainbow unless you pick something else
+  if (k === 'profile'){ const h = profHues(); return (h.length >= 2 ? h : MUSIC_PAL.rainbow.c).slice(0, 8); }
+  return (MUSIC_PAL[k] || MUSIC_PAL.rainbow).c;
+}
+// the mood: P pulses per cycle, one color each. The Peak's speed is whole cycles per 3 minutes, so pick the number of
+// pulses that gets closest to the real tempo
+function musicMood(bpm){
+  const st = store.musicStyle || 'beat';
+  // every color gets one pulse per cycle: use as many of your colors as fit (up to 4, at least 2), whichever count
+  // lands closest to the real tempo (ties go to more colors)
+  // the slow styles pick the nearest slow rhythm the Peak can hit (its slowest speeds are coarse): a pulse every
+  // 4 beats (or 2) for Bar, every 8 (or 4 / 16) for Chill
+  const all = musicCols(), most = Math.max(2, Math.min(4, all.length));
+  const every = st === 'chill' ? [[8, 0], [4, .04], [16, .04]] : st === 'bars' ? [[4, 0], [2, .04], [8, .04]] : [[1, 0]];
+  let best = null;
+  for (const [d, pen] of every) for (let P = most; P >= 2; P--){
+    const rate = bpm / d, sp = clamp(Math.round(rate / (3 * P)), 1, 255), err = Math.abs(sp * 3 * P - rate) / rate, cost = err + pen;
+    if (!best || cost < best.cost - .01) best = { P, sp, err, cost, d };
+  }
+  const cols = Array.from({ length: best.P }, (_, k) => all[Math.floor(k * all.length / best.P) % all.length]);
+  MUSIC.moodCols = cols; // the visualizer shows the same colors in the same order
+  const shape = st === 'beat' ? [1, .62, .38, .22, .12, .06, .02, 0] : [.08, .35, .75, 1, .8, .5, .25, .1]; // a punch on the beat, or a smooth swell
+  const arr = []; cols.forEach(c => shape.forEach(v => arr.push(mixL('#000000', c.toLowerCase(), v))));
+  const lamp = { name:'pikaled2', param:{ bright:255, speed: best.sp, speedDi0: Math.min(best.sp * 2, 255) / 8, speedDi1: Math.min(best.sp * 2, 255), anim:1, plNum:0, plDenom:0,
+    offset: Array(ledCount()).fill(0), color: MoodEngine.packRgb(arr), colorLen: arr.length, diFrac:0 } };
+  return cbor({ lamp, meta:{ version:1, moodName:'Music sync' } });
+}
+function musicSend(on){ // the app only needs to listen; the light data stays here
+  window.EMBER_APP.post('music', Object.assign({ api2:false, style:'beat', sens: +store.musicSens || 1, lat: MUSIC.lat, blobs:['AA=='], dims:['AA=='], flash:['AA=='] }, on == null ? {} : { on }));
+}
+window.emberMusicState = (on, why) => {
+  store.musicOn = !!on; save(); drawAppLights();
+  if (on){ MUSIC.wroteBpm = 0; MUSIC.wroteKey = ''; MUSIC.wroteAt = 0; }
+  if (on && store.musicWant) toast('Music sync is on. Play something with a beat 🎵');
+  if (!on && store.musicWant) toast(why === 'mic' ? 'Music sync needs the microphone. Turn it on in Settings > Emberline' : 'Music sync couldn’t start the mic. Close other apps using it and try again');
+  store.musicWant = false;
+};
+// a beat tick from the app (already early by the Peak's delay). Usually nothing is written: only when the tempo moved,
+// a setting changed, or it's the first lock, and never within 10 s of the last write
+window.emberBeat = (i, kind) => {
+  if (i === -1){ MUSIC.wroteBpm = 0; ledJob(previewClear); return; } // stopped: put the light back
+  const vc = MUSIC.moodCols && MUSIC.moodCols.length ? MUSIC.moodCols : musicCols(); MUSIC.i = (MUSIC.i + 1) % vc.length; MUSIC.cur = vc[MUSIC.i];
+  if (!store.musicOn || S.mode !== 'live' || (S.state >= 7 && S.state <= 9) || S.api === 2 || isProxy() || MUSIC.busy || !(MUSIC.bpm > 0)) return;
+  const key = [store.musicPal, store.musicStyle, S.active].join('|'), moved = !MUSIC.wroteBpm || Math.abs(MUSIC.bpm - MUSIC.wroteBpm) / MUSIC.wroteBpm > .06;
+  const since = Date.now() - MUSIC.wroteAt;
+  if (!(moved || key !== MUSIC.wroteKey) || since < (key !== MUSIC.wroteKey && MUSIC.wroteKey ? 3000 : MUSIC_GAP)) return; // you changed a setting: show it soon
+  try { if (zoneLive.on) zoneLiveStop(true); } catch(e){}
+  MUSIC.busy = true; MUSIC.wroteAt = Date.now(); MUSIC.wroteBpm = MUSIC.bpm; MUSIC.wroteKey = key;
+  let blob; try { blob = musicMood(MUSIC.bpm); } catch(e){ MUSIC.busy = false; return; }
+  const t0 = performance.now();
+  ledJob(() => previewWrite(blob).catch(() => {})).finally(() => {
+    const dt = (performance.now() - t0) / 1000; if (dt > .03 && dt < 1.5){ MUSIC.lat = MUSIC.lat * .6 + dt * .4; window.EMBER_APP.post('music', { lat: MUSIC.lat }); }
+    MUSIC.busy = false;
+  });
+};
+// the visualizer: a circle that breathes with the bass and pops on each beat
+window.emberMusicMeter = (lv, bpm, beat) => {
+  MUSIC.bpm = bpm || 0;
+  const c = $('#musViz'); if (!c) return;
+  c.style.setProperty('--mc', MUSIC.cur || '#7300ff'); c.style.setProperty('--ml', Math.min(1, lv).toFixed(3));
+  if (beat){ c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
+  const t = $('#musBpm'); if (t){ const s = bpm ? bpm + ' BPM' : 'Finding the beat…'; if (t.textContent !== s) t.textContent = s; }
+};
+function musicToggle(){
+  if (!IS_APP) return;
+  if (store.musicOn){ window.EMBER_APP.post('music', { on:false }); return; }
+  if (isProxy() || S.api === 2) return toast('Music sync works on the Peak Pro for now');
+  store.musicWant = true; try { zoneLiveStop(true); } catch(e){} musicSend(true); // the music mood owns the light now
+}
+function drawAppLights(){
+  const el = $('#appLights'); if (!el) return;
+  el.hidden = !IS_APP; if (!IS_APP) return;
+  const on = !!store.musicOn, st = ['beat', 'bars', 'chill'].includes(store.musicStyle) ? store.musicStyle : 'beat', pk = store.musicPal || 'rainbow', sens = +store.musicSens || 1;
+  const sw = k => { const c = k === 'profile' ? musicCols() : MUSIC_PAL[k].c; return `linear-gradient(90deg,${c.concat(c[0]).join(',')})`; };
+  el.innerHTML = `<div class="mus-head"><div><b>🎵 Music sync</b><small>${on ? 'Listening' : 'Your Peak pulses in time with the music'}</small></div>
+      <label class="toggle" style="margin:0"><input type="checkbox" class="switch" data-music ${on ? 'checked' : ''} aria-label="Music sync"></label></div>
+    ${on ? `<div class="mus-viz" id="musViz"><i></i><span id="musBpm">Finding the beat…</span></div>` : ''}
+    <div class="mus-row"><span>Style</span><div class="seg">${[['beat', 'Pulse'], ['bars', 'Bar'], ['chill', 'Chill']].map(([k, n]) => `<button data-mstyle="${k}" aria-pressed="${st === k}">${n}</button>`).join('')}</div></div>
+    <div class="mus-pals">${Object.entries(MUSIC_PAL).map(([k, v]) => `<button data-mpal="${k}" aria-pressed="${pk === k}"><i style="background:${sw(k)}"></i>${v.n}</button>`).join('')}</div>
+    <div class="mus-row"><span>Sensitivity</span><input type="range" data-msens min="0.5" max="2" step="0.1" value="${sens}" aria-label="Sensitivity"></div>
+    <p class="muted" style="margin:0;font-size:12px">Play it out loud (the mic listens). Keeps going with the app closed, pauses during a session.</p>
+    <div class="mus-sep"></div>
+    <button class="btn small" data-camcolor style="justify-self:start">📷 Color from camera</button>`;
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest) return;
+  if (e.target.closest('[data-camcolor]')){ if (S.mode !== 'live') toast(`Connect your ${devWord()} to see it live`); window.EMBER_APP && window.EMBER_APP.post('camera', {}); }
+  if (e.target.closest('[data-music]')){ e.preventDefault(); musicToggle(); }
+  const ms = e.target.closest('[data-mstyle]'); if (ms){ store.musicStyle = ms.dataset.mstyle; save(); drawAppLights(); } // applied on the next beat (at most every 10 s)
+  const mp = e.target.closest('[data-mpal]'); if (mp){ store.musicPal = mp.dataset.mpal; save(); drawAppLights(); }
+});
+document.addEventListener('change', e => { const r = e.target.closest && e.target.closest('[data-msens]'); if (r){ store.musicSens = +r.value; save(); drawAppLights(); if (IS_APP) window.EMBER_APP.post('music', { sens: store.musicSens }); } });
+setTimeout(() => { store.musicOn = false; drawAppLights(); }, 0); // a fresh start never has music sync running
+window.emberBgPause = () => {
+  const c = appCtx(); BG.on = true; try { hitLoopStop(); } catch(e){} saveOpenSess();
+  try { if (phRestore) phEnd(); } catch(e){} // the app plays these from here: put back anything showing so nothing gets stuck on the Peak
+  try { if (discoRestore) ledJob(async () => { const r = discoRestore; discoRestore = null; if (r) await r(); }); } catch(e){}
+  return JSON.stringify(c);
+};
+window.emberBgResume = json => {
+  BG.on = false;
+  let r = {}; try { r = JSON.parse(json || '{}') || {}; } catch(e){}
+  const near = (a, b) => a && b && Math.abs(a - b) < 1500;
+  const taxNow = () => { try { return rankLock() ? 0 : (RANK_TAX[myRank().tier.n] || 0); } catch(e){ return 0; } };
+  const list = (r.sessions || []).slice().sort((a, b) => a.t - b.t);
+  let n = 0, mineDone = false;
+  for (const s of list){
+    const mine = cur && near(cur.t, s.t) ? cur : null; // the session the page was in when the app went away
+    const p = s.p != null ? s.p : mine ? mine.p : S.active, pr = S.profiles[p] || {};
+    const run = typeof s.run === 'number' ? s.run : null, tax = mine && mine.tax != null ? mine.tax : taxNow();
+    const target = mine ? mine.target : pr.tempC ? Math.round(c2f(pr.tempC)) : undefined;
+    const setF = Math.max(s.setF || 0, (mine && mine.setF) || 0) || undefined;
+    logSession({ setF, hitAt: s.hitAt, tax: tax && run >= RANK_TAX_SECS ? tax : undefined, blk: mine ? mine.blk : champBlink(), t: s.t, p, name: mine ? mine.name : (pr.name || 'Session'),
+      target, peak: setF || target, dur: Math.round(((s.end || Date.now()) - s.t) / 1000), batt: mine ? mine.batt : S.battery, hits: (s.hits || []).slice(0, 20), vapor: pr.vapor, sc: sinceClean() + 1, run, bg: true });
+    if (mine){ cur = null; store.openSess = null; mineDone = true; }
+    n++;
+  }
+  if (n){ S.cyclesSinceOdo = (S.cyclesSinceOdo || 0) + n; save(); setTimeout(() => toast(`Tracked ${n} session${n > 1 ? 's' : ''} while the app was closed`), 600); } // so the dab counter catch-up doesn't add them again
+  const o = r.open;
+  if (o && o.t){ // a session still going: carry on with it here
+    if (!cur || !near(cur.t, o.t)){ const pr = S.profiles[o.p] || {}; cur = { t:o.t, p:o.p, name: pr.name || 'Session', target: pr.tempC ? Math.round(c2f(pr.tempC)) : null, peak: o.setF || 0, hit: !!o.readyAt, batt: S.battery };
+      if (o.readyAt){ cur.readyAt = o.readyAt; cur.tax = taxNow(); cur.blk = champBlink(); } }
+    if (o.readyAt && !cur.readyAt){ cur.readyAt = o.readyAt; cur.hit = true; }
+    if (o.setF) cur.setF = Math.max(cur.setF || 0, o.setF);
+    HIT.hits = (o.hits || []).slice(); HIT.ends = (o.ends || []).slice(); cur.hits = HIT.hits.slice(); saveOpenSess();
+  } else if (r.owned && cur && !mineDone){ cur = null; store.openSess = null; save(); } // it ended while away without counting (too short)
+  render(); try { drawRank(); } catch(e){}
+};
 function data(){ return demo || { sessions:store.sessions, lastClean:store.lastClean }; }
 // ranked counts only this Puffco account's sessions (several accounts can share one phone)
 function acctId(){ const a = store.account, id = a && a.data && a.data.user && a.data.user.id; return id != null ? String(id) : (a && a.email ? 'e:' + a.email.toLowerCase() : null); }
@@ -4413,7 +4702,7 @@ function setHTML(el, html){ if (el && el._h !== html){ el._h = html; el.innerHTM
 /* haptics: only on the moments that matter (start/stop/boost, picking a profile or vapor level, saving lights, marking cleaned) */
 const HZ_SEL = '#bBoost, #bCleaned, #ltSave, #homeChips .pchip, .seg.vap button, .seg.hseg button, #nav > button, .bv-art, .soc-follow, .bv-close, .crop [data-c="ok"]';
 function applyHaptics(){
-  if (document.documentElement.dataset.ui === 'cockpit') return;
+  if (document.documentElement.dataset.ui === 'cockpit' || IS_APP) return; // the iPhone app taps natively (see the pointerdown listener below)
   document.querySelectorAll('[data-bv] > .hz').forEach(x => x.remove());
   document.querySelectorAll(HZ_SEL).forEach(el => {
     if (el.closest('.soc-list')){ const x = el.querySelector(':scope > .hz'); if (x){ x.remove(); el.classList.remove('hz-host'); } return; } // no haptic on Follow in the friends / search lists
@@ -4900,7 +5189,7 @@ function lastSessionHtml(){
   const mins = Math.round((Date.now() - s.t) / 60000), when = mins < 1 ? 'just now' : mins < 60 ? mins + 'm ago' : mins < 1440 ? Math.round(mins / 60) + 'h ago' : new Date(s.t).toLocaleDateString([], { month:'short', day:'numeric' });
   const len = typeof s.run === 'number' ? s.run : s.dur || 0;
   const why = notCounted(s) || (s.t < m0.getTime() ? 'From last month' : '');
-  return `<div class="last-sess"><div class="row between"><span class="label">Last session</span><span class="muted" style="font-size:12px">${esc(s.name || 'Session')} · ${when}</span></div>
+  return `<div class="last-sess"><div class="row between"><span class="label">Last session</span><span class="row" style="gap:8px"><span class="muted" style="font-size:12px">${esc(s.name || 'Session')} · ${when}</span><button class="btn small" data-sesshare style="padding:4px 10px;min-height:0">Share</button></span></div>
     <div class="ls-grid"><div><b>${rp > 0 ? '+' + rp : rp}</b><span>RP</span></div><div><b>${hits.length}</b><span>hit${hits.length === 1 ? '' : 's'}</span></div><div><b>${best ? best.toFixed(1) + 's' : '-'}</b><span>best hit</span></div><div><b>${blinks}</b><span>blinker${blinks === 1 ? '' : 's'}</span></div><div><b>${len ? len + 's' : '-'}</b><span>length</span></div></div>
     ${parts && !why ? `<p class="muted" style="margin:0;font-size:12px">${parts}</p>` : ''}${why ? `<p class="muted" style="margin:0;font-size:12px">${why}</p>` : ''}</div>`;
 }
@@ -6368,7 +6657,7 @@ document.addEventListener('pointerdown', e => {
 }, true);
 $('#connBtn').addEventListener('click', () => {
   if (S.mode === 'live') return; // connected: tapping the pill does nothing (disconnect is in the device menu)
-  if (C.state === 'reconnecting'){ manualDisconnect = true; reconnectRun++; setConnUI('idle'); return; }
+  if (C.state === 'reconnecting'){ appAuto(false); manualDisconnect = true; reconnectRun++; setConnUI('idle'); return; }
   if (C.state === 'unsupported'){ show('home'); return; }
   startConnect(false);
 });
@@ -6812,6 +7101,7 @@ const zoneLive = { on:false, meta:null, timer:null, busy:false, t0:0 };
 const ZFX_ANIM = ['pulse','fade','rainbow','flicker','strobe'];
 function zoneLiveStart(meta, quiet){
   if (S.mode !== 'live'){ if (!quiet) needLive('preview zones'); return false; }
+  if (store.musicOn){ if (!quiet) toast('Turn off Music sync first'); return false; } // two things animating the same light fight (and it's a lot of writes)
   if (S.api === 2) return false;
   zoneLive.meta = meta; zoneLive.t0 = performance.now(); clearTimeout(previewTimer);
   if (zoneLive.on) return true;
@@ -8092,7 +8382,7 @@ $('#devMenu').addEventListener('click', e => {
   e.stopPropagation();
   const d = e.target.closest('[data-dev]'), f = e.target.closest('[data-forget]');
   if (f){ const list = devList(), x = list[+f.dataset.forget]; list.splice(+f.dataset.forget, 1);
-    if (x && x.id === store.lastDeviceId){ const n = list[0]; store.lastDeviceId = n ? n.id : null; store.lastDeviceName = n ? n.name : null; }
+    if (x && x.id === store.lastDeviceId){ appAuto(false); const n = list[0]; store.lastDeviceId = n ? n.id : null; store.lastDeviceName = n ? n.name : null; }
     save(); drawDevMenu(); toast(`Forgot ${x ? (x.label || x.name) : 'device'}`); return; }
   if (d){ switchToDevice(devList()[+d.dataset.dev]); return; }
   if (e.target.closest('#dmAdd')){ addDevice(); return; }
@@ -8171,7 +8461,7 @@ $('#connectCard').addEventListener('click', async e => {
     catch(err){ toast(location.href); }
     return;
   }
-  if (C.state === 'reconnecting'){ manualDisconnect = true; reconnectRun++; setConnUI('idle'); return; }
+  if (C.state === 'reconnecting'){ appAuto(false); manualDisconnect = true; reconnectRun++; setConnUI('idle'); return; }
   startConnect(false);
 });
 
