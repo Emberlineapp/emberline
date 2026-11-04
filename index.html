@@ -2119,6 +2119,7 @@ body.vr-on #dvFrame{display:none}
     <div class="card" style="display:grid;gap:10px">
       <span class="label">Display</span>
       <label class="toggle" id="fsRow"><span>Full screen<br><span class="muted" style="font-size:13px" id="fsNote">Hides the browser bars</span></span><input type="checkbox" class="switch" id="tFull"></label>
+      <button class="btn small" id="appTestBtn" hidden style="justify-self:start">iPhone app: open the test build</button>
       <span class="label" style="margin-top:6px">Connection</span>
       <label class="toggle"><span>Connect automatically<br><span class="muted" style="font-size:13px">Reconnects to your last Peak when you open Emberline</span></span><input type="checkbox" class="switch" id="tAuto"></label>
       <label class="toggle"><span>Show all Bluetooth devices when pairing<br><span class="muted" style="font-size:13px">Use if your Peak has a custom name and won't show up</span></span><input type="checkbox" class="switch" id="tAll"></label>
@@ -4881,6 +4882,7 @@ document.addEventListener('click', e => {
 });
 function drawSettings(){
   try { drawCelDev(); } catch(e){}
+  try { const tb = $('#appTestBtn'); tb.hidden = !(IS_APP && isRich()); tb.onclick = () => window.EMBER_APP.post('site', { test:true }); } catch(e){} // Rich only: try test features in the app
   $('#themeList').innerHTML = THEMES.map(t => {
     if (t.gold){
       const n = Math.max(0, Math.min(blinkerCount(), GOLD_GOAL)), open = goldUnlockedNow(), pct = n / GOLD_GOAL;
