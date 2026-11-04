@@ -4882,7 +4882,7 @@ document.addEventListener('click', e => {
 });
 function drawSettings(){
   try { drawCelDev(); } catch(e){}
-  try { const tb = $('#appTestBtn'); tb.hidden = !IS_APP; // anyone in the iPhone app can try the test build (it never adds RP) tb.onclick = () => window.EMBER_APP.post('site', { test:true }); } catch(e){} // Rich only: try test features in the app
+  try { const tb = $('#appTestBtn'); tb.hidden = !IS_APP; /* anyone in the iPhone app can try the test build (it never adds RP) */ tb.onclick = () => window.EMBER_APP.post('site', { test:true }); } catch(e){} // Rich only: try test features in the app
   $('#themeList').innerHTML = THEMES.map(t => {
     if (t.gold){
       const n = Math.max(0, Math.min(blinkerCount(), GOLD_GOAL)), open = goldUnlockedNow(), pct = n / GOLD_GOAL;
