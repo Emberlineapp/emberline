@@ -347,7 +347,7 @@ Deno.serve(async (req) => {
     if (Array.isArray(body.showcase)) {
       // up to 3 badges: "dev" (only if you have it) or "YYYY-MM:<tier 0-5>" or "YYYY-MM:now"
       const ok = body.showcase.filter((k: unknown) => typeof k === "string" &&
-        (k === "dev" ? !!(existing && existing.dev) : /^\d{4}-\d{2}:(?:[0-5]|now)$/.test(k) || /^sp:[a-z0-9]{2,16}$/.test(k)) && handedOut(k));
+        (k === "dev" ? !!(existing && existing.dev) : /^\d{4}-\d{2}:(?:[0-5]|now)$/.test(k) || /^sp:[a-z0-9][a-z0-9-]{1,23}$/.test(k)) && handedOut(k));
       row.showcase = [...new Set(ok)].slice(0, 3);
     }
     if (typeof body.month === "string" && /^\d{4}-\d{2}$/.test(body.month)) row.month = body.month;
