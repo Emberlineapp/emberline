@@ -182,6 +182,32 @@ Deno.serve(async (req) => {
 
     if (body.action === "me") { if (existing) await saveDevices(); return json({ player: await withInvites(existing) }); }
 
+    // ---- Ember Token: a 1 in 20,000 drop when a session reaches Ready. The server rolls, so the app can't fake a win.
+    // A win is a month of Premium (on top of any you have) and the Ember Token badge. At most 12 rolls a day, 2 minutes
+    // apart, so spamming the button can't buy extra chances. The developer can force a win to test it (body.force)
+    if (body.action === "ember_roll") {
+      if (!existing) return json({ win: false, why: "no_profile" });
+      const ODDS = 20000, now = Date.now(), day = new Date(now).toISOString().slice(0, 10), key = "roll:" + id;
+      const { data: kv } = await sb.from("app_kv").select("value").eq("key", key).maybeSingle();
+      const prev = (kv && kv.value) || {};
+      const st = prev.day === day ? prev : { day, n: 0, last: 0 };
+      if (st.n >= 12 || now - (st.last || 0) < 120000) return json({ win: false, why: "limit" });
+      st.n = (st.n || 0) + 1; st.last = now;
+      await sb.from("app_kv").upsert({ key, value: st });
+      const r = new Uint32Array(1); crypto.getRandomValues(r);
+      const forced = !!body.force && !!existing.dev;
+      if (!forced && r[0] >= Math.floor(4294967296 / ODDS)) return json({ win: false });
+      const aw: string[] = Array.isArray(existing.awards) ? existing.awards : [];
+      const lifetime = aw.includes("premium");
+      const had = aw.filter((a) => /^premium:\d{4}-\d{2}-\d{2}$/.test(a)).map((a) => a.slice(8)).sort().pop() || "";
+      const from = had > day ? Date.parse(had + "T00:00:00Z") : now;
+      const until = new Date(from + 31 * 864e5).toISOString().slice(0, 10);
+      const next = [...new Set(aw.filter((a) => !a.startsWith("premium:")).concat(lifetime ? [] : ["premium:" + until], ["embertoken"]))];
+      await sb.from("players").update({ awards: next }).eq("id", id);
+      await sb.from("app_kv").upsert({ key: "token:" + id + ":" + now, value: { player: id, username: existing.username, at: new Date(now).toISOString(), until: lifetime ? "lifetime" : until, forced } });
+      return json({ win: true, until: lifetime ? null : until, player: { ...existing, awards: next } });
+    }
+
     // ---- notifications: an inbox in the app, plus a push to the phone when Alerts are on ----
     const notify = async (player: string, kind: string, data: Record<string, unknown>, title: string, text: string) => {
       await sb.from("notes").insert({ player, kind, from_id: id, from_name: existing ? existing.username : null, data });
@@ -340,7 +366,7 @@ Deno.serve(async (req) => {
     const joined = existing && existing.created_at ? new Date(existing.created_at).getTime() : Date.now();
     const handedOut = (k: string) => {
       if (k === "sp:premium") return premium;
-      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:podium1", "sp:podium2", "sp:podium3", "sp:squad"].includes(k)) return awards.includes(k.slice(3));
+      if (["sp:bughunter", "sp:discord", "sp:podium", "sp:podium1", "sp:podium2", "sp:podium3", "sp:squad", "sp:embertoken"].includes(k)) return awards.includes(k.slice(3));
       if (k === "sp:founder") return joined < Date.parse("2026-11-01T00:00:00Z");
       return true;
     };
