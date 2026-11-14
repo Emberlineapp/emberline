@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
     if (body.action === "me") { if (existing) await saveDevices(); return json({ player: await withInvites(existing) }); }
 
     // ---- Ember Token: a 1 in 20,000 drop when a session reaches Ready. The server rolls, so the app can't fake a win.
-    // A win is a month of Premium (on top of any you have) and the Ember Token badge. At most 12 rolls a day, 2 minutes
+    // A win is a year of Premium (on top of any you have) and the Ember Token badge. At most 12 rolls a day, 2 minutes
     // apart, so spamming the button can't buy extra chances. The developer can force a win to test it (body.force)
     if (body.action === "ember_roll") {
       if (!existing) return json({ win: false, why: "no_profile" });
@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
       const lifetime = aw.includes("premium");
       const had = aw.filter((a) => /^premium:\d{4}-\d{2}-\d{2}$/.test(a)).map((a) => a.slice(8)).sort().pop() || "";
       const from = had > day ? Date.parse(had + "T00:00:00Z") : now;
-      const until = new Date(from + 31 * 864e5).toISOString().slice(0, 10);
+      const until = new Date(from + 365 * 864e5).toISOString().slice(0, 10); // a year of Premium
       const next = [...new Set(aw.filter((a) => !a.startsWith("premium:")).concat(lifetime ? [] : ["premium:" + until], ["embertoken"]))];
       await sb.from("players").update({ awards: next }).eq("id", id);
       await sb.from("app_kv").upsert({ key: "token:" + id + ":" + now, value: { player: id, username: existing.username, at: new Date(now).toISOString(), until: lifetime ? "lifetime" : until, forced } });
