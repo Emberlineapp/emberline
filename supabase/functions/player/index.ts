@@ -220,6 +220,55 @@ Deno.serve(async (req) => {
       const { count } = await sb.from("push_subs").select("endpoint", { count: "exact", head: true }).eq("player", id);
       return json({ notes: list || [], unread, phones: count || 0 });
     }
+    // ---- Premium alerts: "a friend is online" and "someone's in the 1v1 queue" ----
+    // The queue and who's online only exist between open apps, so the app tells the server when you open Emberline
+    // (kind "online", at most every 30 min) or join the queue (kind "queue", at most every 10 min). The server writes a
+    // note for Premium players who turned that alert on: the iPhone app shows notes as phone notifications (and Path
+    // gets a web push if alerts are on there). Settings live in app_kv "alerts:<id>" = { online, queue }
+    const premOf = (aw: unknown) => Array.isArray(aw) && (aw as string[]).some((a) => a === "premium" || (/^premium:\d{4}-\d{2}-\d{2}$/.test(a) && a.slice(8) >= new Date().toISOString().slice(0, 10)));
+    if (body.action === "alerts") {
+      const cur = await sb.from("app_kv").select("value").eq("key", "alerts:" + id).maybeSingle();
+      const v = { online: false, queue: false, ...((cur.data && cur.data.value) || {}) };
+      if (typeof body.online === "boolean" || typeof body.queue === "boolean") {
+        if (!existing || !premOf(existing.awards)) return json({ error: "premium_only" }, 403);
+        if (typeof body.online === "boolean") v.online = body.online;
+        if (typeof body.queue === "boolean") v.queue = body.queue;
+        await sb.from("app_kv").upsert({ key: "alerts:" + id, value: v });
+      }
+      return json({ alerts: v });
+    }
+    if (body.action === "presence") {
+      if (!existing || existing.banned) return json({ ok: true });
+      const kind = body.kind === "queue" ? "queue" : "online", now = Date.now(), gap = kind === "queue" ? 10 * 60000 : 30 * 60000;
+      const pk = await sb.from("app_kv").select("value").eq("key", "pres:" + id).maybeSingle();
+      const pv: Record<string, number> = (pk.data && pk.data.value) || {};
+      if (now - (pv[kind] || 0) < gap) return json({ ok: true, quiet: true });
+      pv[kind] = now; await sb.from("app_kv").upsert({ key: "pres:" + id, value: pv });
+      // who wants this alert: Premium players with it turned on (and for "online", only people who follow you)
+      const { data: rows } = await sb.from("app_kv").select("key,value").like("key", "alerts:%").limit(2000);
+      let want = (rows || []).filter((r: { key: string; value: Record<string, boolean> }) => r.value && r.value[kind]).map((r: { key: string }) => r.key.slice(7)).filter((p: string) => p !== id);
+      if (kind === "online" && want.length) {
+        const { data: f } = await sb.from("follows").select("follower").eq("followee", id).in("follower", want.slice(0, 1000));
+        want = (f || []).map((x: { follower: string }) => x.follower);
+      }
+      if (!want.length) return json({ ok: true, sent: 0 });
+      const { data: ps } = await sb.from("players").select("id,awards,banned").in("id", want.slice(0, 1000));
+      const to = (ps || []).filter((p: { awards: unknown; banned: boolean }) => !p.banned && premOf(p.awards)).map((p: { id: string }) => p.id);
+      // one queue alert per person every 20 minutes, however many people queue up
+      let send = to;
+      if (kind === "queue" && to.length) {
+        const since = new Date(now - 20 * 60000).toISOString();
+        const { data: recent } = await sb.from("notes").select("player").eq("kind", "queue").gte("created_at", since).in("player", to);
+        const got = new Set((recent || []).map((x: { player: string }) => x.player));
+        send = to.filter((p: string) => !got.has(p));
+      }
+      const name = existing.username || "Someone";
+      for (const p of send.slice(0, 300)) {
+        if (kind === "online") await notify(p, "online", {}, `🟢 ${name} is online`, "Open Emberline to 1v1 or start a sesh with them.");
+        else await notify(p, "queue", {}, `⚔️ ${name} is in the 1v1 queue`, "Open Emberline and queue up to match them.");
+      }
+      return json({ ok: true, sent: send.length });
+    }
     if (body.action === "push_link") {
       if (!existing) return json({ error: "username_required" }, 400);
       const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", r = crypto.getRandomValues(new Uint8Array(6));
