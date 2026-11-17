@@ -5470,8 +5470,10 @@ function myStats(){
   const ss = all.filter(s => s.t >= m0 && !(typeof s.run === 'number' && s.run < 20) && !lowTemp(s)), hits = ss.flatMap(s => s.hits || []);
   return { sessions: ss.length, hits: hits.length, best: hits.length ? Math.round(Math.max(...hits) * 10) / 10 : 0,
     days: new Set(ss.map(s => new Date(s.t).toDateString())).size, blAll: Math.max(all.reduce((a, s) => a + (s.hits || []).filter(h => h >= 8).length, 0), serverBlinkers()), // never lower than another device already sent
-    ...duelPubStats() };
+    ...duelPubStats(), bdg: myBadgeIds() };
 }
+// the badges you've earned, kept on the server too: a new phone, the iPhone app or a cleared browser gets them back
+function myBadgeIds(){ try { spbStatus(); } catch(e){} const keep = (store.spbKeep || {})[acctId() || 'local'] || {}; return Object.keys(keep).filter(id => id !== 'premium').slice(0, 120); }
 // 1v1 record for your profile: real matches only (no bot or demo), all time. Never lower than what another device sent
 function duelPub(){
   if (!store.duelPub){ const h = (store.duelHist || []).filter(x => !x.bot); store.duelPub = { w: h.filter(x => x.r === 'win').length, l: h.filter(x => x.r === 'lose').length, d: h.filter(x => x.r === 'draw').length }; }
@@ -6202,6 +6204,8 @@ function spbStatus(){
   if (!demo){
     const key = acctId() || 'local', all = store.spbKeep = store.spbKeep || {}, keep = all[key] = all[key] || {};
     let changed = false;
+    { const sv = ((LB.me || lbStore().meCache) || {}).stats, ids = sv && Array.isArray(sv.bdg) ? sv.bdg : []; // earned on another phone or browser
+      ids.forEach(id => { const b = typeof id === 'string' && spbById(id); if (b && b.id !== 'premium' && !keep[b.id]){ keep[b.id] = Date.now(); changed = true; } }); }
     SPB_ALL.forEach(b => { if (b.id !== 'premium' && out[b.id] && out[b.id].got && !keep[b.id]){ keep[b.id] = Date.now(); changed = true; } });
     Object.keys(keep).forEach(id => { if (id !== 'premium') out[id] = Object.assign({}, out[id], { got: true }); });
     if (changed) save();

@@ -426,7 +426,11 @@ Deno.serve(async (req) => {
       const old = existing && existing.stats && typeof existing.stats === "object" ? existing.stats : {};
       for (const k of ["blAll", "dw", "dl", "dd"]) if (Number(old[k]) > (st[k] ?? 0)) st[k] = Number(old[k]);
       if (sameMonth) for (const k of ["sessions", "hits", "days", "best"]) if (Number(old[k]) > (st[k] ?? 0)) st[k] = Number(old[k]);
-      row.stats = st;
+      // the badges you've earned (ids only), so a new phone, the iPhone app or a cleared browser gets them back.
+      // Only ever grows. Handed-out badges (Premium, podium...) are still checked from awards before a showcase keeps them
+      const bdgIn = Array.isArray(body.stats.bdg) ? body.stats.bdg : [], bdgOld = Array.isArray(old.bdg) ? old.bdg : [];
+      const bdg = [...new Set([...bdgOld, ...bdgIn].filter((x) => typeof x === "string" && /^[a-z0-9][a-z0-9-]{1,23}$/.test(x)))].slice(0, 200);
+      row.stats = bdg.length ? { ...st, bdg } : st;
     }
 
     const q = existing
